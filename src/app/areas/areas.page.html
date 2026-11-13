@@ -1,13 +1,834 @@
+
 <ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title>areas</ion-title>
+
+  <ion-toolbar color="primary">
+
+    <ion-buttons slot="start">
+
+      <ion-button
+        (click)="volver()"
+        aria-label="Regresar">
+
+        <ion-icon
+          slot="icon-only"
+          name="arrow-back-outline">
+        </ion-icon>
+
+      </ion-button>
+
+    </ion-buttons>
+
+    <ion-title>
+      {{
+        vista === 'lista'
+          ? 'Áreas'
+          : vista === 'detalle'
+          ? 'Detalle del área'
+          : editando
+          ? 'Editar área'
+          : 'Nueva área'
+      }}
+    </ion-title>
+
+    <ion-buttons
+      slot="end"
+      *ngIf="vista === 'lista'">
+
+      <ion-button
+        (click)="cargarDatos()"
+        [disabled]="cargando || cargandoEdificios"
+        aria-label="Actualizar">
+
+        <ion-icon
+          slot="icon-only"
+          name="refresh-outline">
+        </ion-icon>
+
+      </ion-button>
+
+      <ion-button
+        *ngIf="esAdmin"
+        (click)="nuevaArea()"
+        aria-label="Registrar área">
+
+        <ion-icon
+          slot="icon-only"
+          name="add-outline">
+        </ion-icon>
+
+      </ion-button>
+
+    </ion-buttons>
+
   </ion-toolbar>
+
 </ion-header>
 
+
 <ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">areas</ion-title>
-    </ion-toolbar>
-  </ion-header>
+
+  <!-- ================================= -->
+  <!-- LISTADO -->
+  <!-- ================================= -->
+
+  <ng-container *ngIf="vista === 'lista'">
+
+    <div class="ion-padding">
+
+      <h2>Administración de áreas</h2>
+
+      <p>
+        Gestiona las áreas institucionales
+        y los edificios a los que pertenecen.
+      </p>
+
+      <!-- RESUMEN -->
+
+      <ion-card>
+
+        <ion-card-header>
+          <ion-card-title>
+            Resumen de áreas
+          </ion-card-title>
+        </ion-card-header>
+
+        <ion-card-content>
+
+          <p>
+            <strong>Total:</strong>
+            {{ totalAreas }}
+          </p>
+
+          <p>
+            <strong>Activas:</strong>
+            {{ totalActivas }}
+          </p>
+
+          <p>
+            <strong>Inactivas:</strong>
+            {{ totalInactivas }}
+          </p>
+
+        </ion-card-content>
+
+      </ion-card>
+
+      <!-- BUSCADOR -->
+
+      <ion-searchbar
+        name="busqueda"
+        [(ngModel)]="busqueda"
+        [debounce]="200"
+        placeholder="Buscar área o edificio">
+      </ion-searchbar>
+
+      <!-- FILTRO POR ESTADO -->
+
+      <ion-item>
+
+        <ion-select
+          name="filtroEstado"
+          label="Filtrar por estado"
+          labelPlacement="stacked"
+          interface="action-sheet"
+          [(ngModel)]="filtroEstado">
+
+          <ion-select-option value="Todos">
+            Todas
+          </ion-select-option>
+
+          <ion-select-option value="Activo">
+            Activas
+          </ion-select-option>
+
+          <ion-select-option value="Inactivo">
+            Inactivas
+          </ion-select-option>
+
+        </ion-select>
+
+      </ion-item>
+
+      <ion-note
+        *ngIf="!cargando && !errorLista">
+
+        {{ areasFiltradas.length }}
+        área(s) encontrada(s)
+
+      </ion-note>
+
+    </div>
+
+    <!-- CARGANDO -->
+
+    <div
+      *ngIf="cargando"
+      class="ion-padding ion-text-center">
+
+      <ion-spinner name="crescent">
+      </ion-spinner>
+
+      <p>Cargando áreas...</p>
+
+    </div>
+
+    <!-- ERROR -->
+
+    <div
+      *ngIf="errorLista && !cargando"
+      class="ion-padding">
+
+      <ion-note color="danger">
+        {{ errorLista }}
+      </ion-note>
+
+      <ion-button
+        expand="block"
+        fill="outline"
+        (click)="cargarAreas()">
+
+        Reintentar
+
+      </ion-button>
+
+    </div>
+
+    <!-- LISTADO DE ÁREAS -->
+
+    <ion-list
+      [inset]="true"
+      *ngIf="!cargando && !errorLista">
+
+      <ion-item
+        *ngFor="
+          let area of areasFiltradas;
+          trackBy: trackById
+        "
+        button
+        detail="true"
+        [disabled]="cargandoDetalle"
+        (click)="verDetalle(area)">
+
+        <ion-icon
+          slot="start"
+          name="business-outline"
+          color="primary">
+        </ion-icon>
+
+        <ion-label>
+
+          <h2>
+            {{ area.nombre }}
+          </h2>
+
+          <p>
+            Edificio:
+            {{ nombreEdificio(area) }}
+          </p>
+
+          <p>
+            ID del área:
+            {{ area.id_area }}
+          </p>
+
+          <ion-badge
+            [color]="colorEstado(area.estado)">
+
+            {{ area.estado }}
+
+          </ion-badge>
+
+        </ion-label>
+
+      </ion-item>
+
+    </ion-list>
+
+    <!-- SIN RESULTADOS -->
+
+    <div
+      class="ion-padding ion-text-center"
+      *ngIf="
+        !cargando &&
+        !errorLista &&
+        areasFiltradas.length === 0
+      ">
+
+      <ion-icon
+        name="business-outline"
+        size="large"
+        color="medium">
+      </ion-icon>
+
+      <h3>No se encontraron áreas</h3>
+
+      <p>
+        No hay registros que coincidan
+        con los filtros seleccionados.
+      </p>
+
+      <ion-button
+        *ngIf="esAdmin"
+        fill="outline"
+        (click)="nuevaArea()">
+
+        <ion-icon
+          slot="start"
+          name="add-outline">
+        </ion-icon>
+
+        Registrar área
+
+      </ion-button>
+
+    </div>
+
+  </ng-container>
+
+
+  <!-- ================================= -->
+  <!-- DETALLE -->
+  <!-- ================================= -->
+
+  <ng-container
+    *ngIf="
+      vista === 'detalle' &&
+      seleccionado as area
+    ">
+
+    <div class="ion-padding">
+
+      <h2>{{ area.nombre }}</h2>
+
+      <ion-badge
+        [color]="colorEstado(area.estado)">
+
+        {{ area.estado }}
+
+      </ion-badge>
+
+      <!-- CARGANDO DETALLE -->
+
+      <div
+        *ngIf="cargandoDetalle"
+        class="ion-padding ion-text-center">
+
+        <ion-spinner name="crescent">
+        </ion-spinner>
+
+        <p>Consultando área...</p>
+
+      </div>
+
+      <!-- ERROR DE DETALLE -->
+
+      <ion-note
+        *ngIf="errorDetalle"
+        color="danger">
+
+        {{ errorDetalle }}
+
+      </ion-note>
+
+      <!-- DATOS GENERALES -->
+
+      <ion-card>
+
+        <ion-card-header>
+
+          <ion-card-title>
+            Información general
+          </ion-card-title>
+
+        </ion-card-header>
+
+        <ion-card-content>
+
+          <ion-list>
+
+            <ion-item>
+
+              <ion-label>
+
+                <h3>Identificador</h3>
+
+                <p>
+                  {{ area.id_area }}
+                </p>
+
+              </ion-label>
+
+            </ion-item>
+
+            <ion-item>
+
+              <ion-label>
+
+                <h3>Nombre del área</h3>
+
+                <p>
+                  {{ area.nombre }}
+                </p>
+
+              </ion-label>
+
+            </ion-item>
+
+            <ion-item>
+
+              <ion-label>
+
+                <h3>Estado</h3>
+
+                <p>
+                  {{ area.estado }}
+                </p>
+
+              </ion-label>
+
+              <ion-badge
+                slot="end"
+                [color]="colorEstado(area.estado)">
+
+                {{ area.estado }}
+
+              </ion-badge>
+
+            </ion-item>
+
+          </ion-list>
+
+        </ion-card-content>
+
+      </ion-card>
+
+      <!-- UBICACIÓN -->
+
+      <ion-card>
+
+        <ion-card-header>
+
+          <ion-card-title>
+            Ubicación
+          </ion-card-title>
+
+        </ion-card-header>
+
+        <ion-card-content>
+
+          <ion-list>
+
+            <ion-item>
+
+              <ion-icon
+                slot="start"
+                name="location-outline"
+                color="primary">
+              </ion-icon>
+
+              <ion-label>
+
+                <h3>Edificio asignado</h3>
+
+                <p>
+                  {{ nombreEdificio(area) }}
+                </p>
+
+              </ion-label>
+
+            </ion-item>
+
+            <ion-item>
+
+              <ion-label>
+
+                <h3>ID del edificio</h3>
+
+                <p>
+                  {{ area.id_edificio }}
+                </p>
+
+              </ion-label>
+
+            </ion-item>
+
+          </ion-list>
+
+        </ion-card-content>
+
+      </ion-card>
+
+      <!-- REGISTROS RELACIONADOS -->
+
+      <ion-card
+        *ngIf="
+          area.total_salones != null ||
+          area.total_contratos != null
+        ">
+
+        <ion-card-header>
+
+          <ion-card-title>
+            Registros relacionados
+          </ion-card-title>
+
+        </ion-card-header>
+
+        <ion-card-content>
+
+          <ion-list>
+
+            <ion-item
+              *ngIf="area.total_salones != null">
+
+              <ion-label>
+
+                <h3>Salones</h3>
+
+                <p>
+                  {{ area.total_salones }}
+                </p>
+
+              </ion-label>
+
+            </ion-item>
+
+            <ion-item
+              *ngIf="area.total_contratos != null">
+
+              <ion-label>
+
+                <h3>Contratos</h3>
+
+                <p>
+                  {{ area.total_contratos }}
+                </p>
+
+              </ion-label>
+
+            </ion-item>
+
+          </ion-list>
+
+        </ion-card-content>
+
+      </ion-card>
+
+      <!-- ÁREA INACTIVA -->
+
+      <ion-note
+        *ngIf="area.estado === 'Inactivo'">
+
+        Esta área se encuentra inactiva.
+        Su información permanece disponible
+        para consulta histórica.
+
+      </ion-note>
+
+      <!-- ACCIONES -->
+
+      <ng-container *ngIf="esAdmin">
+
+        <ion-button
+          expand="block"
+          [disabled]="cargandoDetalle || desactivando"
+          (click)="editarArea()">
+
+          <ion-icon
+            slot="start"
+            name="create-outline">
+          </ion-icon>
+
+          Editar área
+
+        </ion-button>
+
+        <ion-button
+          *ngIf="area.estado === 'Activo'"
+          expand="block"
+          fill="outline"
+          color="danger"
+          [disabled]="cargandoDetalle || desactivando"
+          (click)="confirmarBaja()">
+
+          <ion-icon
+            slot="start"
+            name="ban-outline">
+          </ion-icon>
+
+          Desactivar área
+
+        </ion-button>
+
+      </ng-container>
+
+    </div>
+
+  </ng-container>
+
+
+  <!-- ================================= -->
+  <!-- FORMULARIO -->
+  <!-- ================================= -->
+
+  <ng-container
+    *ngIf="vista === 'formulario' && esAdmin">
+
+    <div class="ion-padding">
+
+      <h2>
+        {{
+          editando
+            ? 'Modificar área'
+            : 'Registrar nueva área'
+        }}
+      </h2>
+
+      <p>
+        Completa la información del área
+        y selecciona el edificio
+        al que pertenece.
+      </p>
+
+      <!-- DATOS GENERALES -->
+
+      <ion-card>
+
+        <ion-card-header>
+
+          <ion-card-title>
+            Información del área
+          </ion-card-title>
+
+        </ion-card-header>
+
+        <ion-card-content>
+
+          <ion-list>
+
+            <!-- NOMBRE -->
+
+            <ion-item>
+
+              <ion-input
+                name="nombre"
+                label="Nombre del área *"
+                labelPlacement="stacked"
+                [(ngModel)]="form.nombre"
+                [maxlength]="120"
+                placeholder="Ej. Departamento de Sistemas"
+                [disabled]="guardando">
+              </ion-input>
+
+            </ion-item>
+
+            <!-- EDIFICIO -->
+
+            <ion-item>
+
+              <ion-select
+                name="id_edificio"
+                label="Edificio *"
+                labelPlacement="stacked"
+                interface="alert"
+                [(ngModel)]="form.id_edificio"
+                [disabled]="
+                  guardando ||
+                  cargandoEdificios
+                ">
+
+                <ion-select-option
+                  *ngFor="
+                    let edificio of edificiosDisponibles
+                  "
+                  [value]="edificio.id_edificio">
+
+                  {{ edificio.nombre }}
+                  -
+                  {{ edificio.estado }}
+
+                </ion-select-option>
+
+              </ion-select>
+
+            </ion-item>
+
+            <!-- ESTADO -->
+
+            <ion-item>
+
+              <ion-select
+                name="estado"
+                label="Estado del área *"
+                labelPlacement="stacked"
+                interface="action-sheet"
+                [(ngModel)]="form.estado"
+                [disabled]="guardando">
+
+                <ion-select-option
+                  value="Activo">
+
+                  Activo
+
+                </ion-select-option>
+
+                <ion-select-option
+                  value="Inactivo">
+
+                  Inactivo
+
+                </ion-select-option>
+
+              </ion-select>
+
+            </ion-item>
+
+          </ion-list>
+
+        </ion-card-content>
+
+      </ion-card>
+
+      <!-- INFORMACIÓN DEL EDIFICIO -->
+
+      <ion-card
+        *ngIf="edificioSeleccionado as edificio">
+
+        <ion-card-header>
+
+          <ion-card-title>
+            Edificio seleccionado
+          </ion-card-title>
+
+        </ion-card-header>
+
+        <ion-card-content>
+
+          <p>
+            <strong>Nombre:</strong>
+            {{ edificio.nombre }}
+          </p>
+
+          <p>
+            <strong>Identificador:</strong>
+            {{ edificio.id_edificio }}
+          </p>
+
+          <p>
+            <strong>Estado:</strong>
+            {{ edificio.estado }}
+          </p>
+
+          <ion-note
+            color="danger"
+            *ngIf="
+              edificio.estado !== 'Activo' &&
+              form.estado === 'Activo'
+            ">
+
+            No puedes activar un área
+            asignada a un edificio inactivo.
+
+          </ion-note>
+
+        </ion-card-content>
+
+      </ion-card>
+
+      <!-- CARGANDO EDIFICIOS -->
+
+      <div
+        *ngIf="cargandoEdificios"
+        class="ion-padding ion-text-center">
+
+        <ion-spinner name="crescent">
+        </ion-spinner>
+
+        <p>
+          Cargando edificios...
+        </p>
+
+      </div>
+
+      <!-- ERROR EDIFICIOS -->
+
+      <div *ngIf="errorEdificios">
+
+        <ion-note color="danger">
+          {{ errorEdificios }}
+        </ion-note>
+
+        <ion-button
+          expand="block"
+          fill="outline"
+          (click)="cargarEdificios()">
+
+          Reintentar cargar edificios
+
+        </ion-button>
+
+      </div>
+
+      <!-- OBSERVACIONES -->
+
+      <ion-note>
+        Los campos marcados con *
+        son obligatorios.
+      </ion-note>
+
+      <ion-note>
+        La desactivación de áreas con
+        salones o contratos relacionados
+        puede estar restringida por el sistema.
+      </ion-note>
+
+      <!-- GUARDAR -->
+
+      <ion-button
+        expand="block"
+        [disabled]="
+          guardando ||
+          cargandoEdificios ||
+          edificios.length === 0
+        "
+        (click)="guardarArea()">
+
+        <ion-spinner
+          *ngIf="guardando"
+          slot="start"
+          name="crescent">
+        </ion-spinner>
+
+        <ion-icon
+          *ngIf="!guardando"
+          slot="start"
+          name="save-outline">
+        </ion-icon>
+
+        {{
+          guardando
+            ? 'Guardando...'
+            : editando
+            ? 'Guardar cambios'
+            : 'Registrar área'
+        }}
+
+      </ion-button>
+
+      <!-- CANCELAR -->
+
+      <ion-button
+        expand="block"
+        fill="clear"
+        [disabled]="guardando"
+        (click)="volver()">
+
+        Volver
+
+      </ion-button>
+
+    </div>
+
+  </ng-container>
+
 </ion-content>
