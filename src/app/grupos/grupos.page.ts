@@ -81,10 +81,17 @@ type FiltroEstado = 'Todos' | EstadoGrupo;
 interface Grupo {
   id_grupo: number;
   clave_grupo: string;
+
   capacidad: number;
   semestre: number;
+
+  // NUEVOS CAMPOS
+  periodo: string;
+  anio: number;
+
   id_materia: number;
   id_docente: number;
+
   modalidad: ModalidadGrupo;
   estado: EstadoGrupo;
 
@@ -131,8 +138,14 @@ interface FormularioGrupo {
   clave_grupo: string;
   capacidad: number | null;
   semestre: number | null;
+
+  // NUEVOS CAMPOS
+  periodo: string;
+  anio: number | null;
+
   id_materia: number | null;
   id_docente: number | null;
+
   modalidad: ModalidadGrupo;
   estado: EstadoGrupo;
 }
@@ -145,11 +158,13 @@ interface RespuestaApi {
 
 interface RespuestaGrupos extends RespuestaApi {
   grupos?: Grupo[];
+  data?: Grupo[];
   total?: number;
 }
 
 interface RespuestaGrupo extends RespuestaApi {
   grupo?: Grupo;
+  data?: Grupo;
 }
 
 interface RespuestaMaterias extends RespuestaApi {
@@ -171,8 +186,13 @@ function formularioVacio(): FormularioGrupo {
     clave_grupo: '',
     capacidad: 40,
     semestre: 1,
+
+    periodo: '',
+    anio: new Date().getFullYear(),
+
     id_materia: null,
     id_docente: null,
+
     modalidad: 'Entre semana',
     estado: 'Planeado'
   };
@@ -292,7 +312,6 @@ export class GruposPage {
   // ======================================
 
   ionViewWillEnter(): void {
-
     const usuario = this.auth.obtenerUsuario();
 
     if (!usuario) {
@@ -318,13 +337,19 @@ export class GruposPage {
   // ======================================
 
   private normalizarGrupo(grupo: Grupo): Grupo {
-
     return {
       ...grupo,
 
       id_grupo: Number(grupo.id_grupo),
+      clave_grupo: String(grupo.clave_grupo ?? ''),
+
       capacidad: Number(grupo.capacidad),
       semestre: Number(grupo.semestre),
+
+      // NUEVOS CAMPOS
+      periodo: String(grupo.periodo ?? ''),
+      anio: Number(grupo.anio ?? 0),
+
       id_materia: Number(grupo.id_materia),
       id_docente: Number(grupo.id_docente),
 
@@ -350,10 +375,7 @@ export class GruposPage {
   // ======================================
 
   get gruposFiltrados(): Grupo[] {
-
-    const texto = this.busqueda
-      .trim()
-      .toLowerCase();
+    const texto = this.busqueda.trim().toLowerCase();
 
     return this.grupos.filter(grupo => {
 
@@ -374,7 +396,12 @@ export class GruposPage {
         grupo.clave_materia,
         this.nombreDocente(grupo),
         grupo.modalidad,
-        grupo.semestre
+        grupo.semestre,
+
+        // NUEVOS CAMPOS
+        grupo.periodo,
+        grupo.anio
+
       ].some(valor =>
         String(valor ?? '')
           .toLowerCase()
@@ -384,11 +411,10 @@ export class GruposPage {
   }
 
   // ======================================
-  // OPCIONES DE MATERIAS
+  // MATERIAS DISPONIBLES
   // ======================================
 
   get materiasDisponibles(): Materia[] {
-
     const idActual = this.editando
       ? this.seleccionado?.id_materia
       : null;
@@ -400,11 +426,10 @@ export class GruposPage {
   }
 
   // ======================================
-  // OPCIONES DE DOCENTES
+  // DOCENTES DISPONIBLES
   // ======================================
 
   get docentesDisponibles(): Docente[] {
-
     const idActual = this.editando
       ? this.seleccionado?.id_docente
       : null;
@@ -420,7 +445,6 @@ export class GruposPage {
   // ======================================
 
   get estadosPermitidos(): EstadoGrupo[] {
-
     if (!this.editando) {
       return [
         'Planeado',
@@ -438,7 +462,6 @@ export class GruposPage {
     }
 
     switch (this.seleccionado.estado) {
-
       case 'Planeado':
         return ['Planeado', 'Abierto'];
 
@@ -458,7 +481,6 @@ export class GruposPage {
   // ======================================
 
   get grupoConDependencias(): boolean {
-
     if (!this.seleccionado || !this.editando) {
       return false;
     }
@@ -479,7 +501,6 @@ export class GruposPage {
   // ======================================
 
   lugaresDisponibles(grupo: Grupo): number | null {
-
     if (grupo.lugares_disponibles != null) {
       return Number(grupo.lugares_disponibles);
     }
@@ -500,7 +521,6 @@ export class GruposPage {
   // ======================================
 
   nombreMateria(grupo: Grupo): string {
-
     if (grupo.nombre_materia) {
       return grupo.nombre_materia;
     }
@@ -518,7 +538,6 @@ export class GruposPage {
   // ======================================
 
   nombreDocente(grupo: Grupo): string {
-
     const partes = [
       grupo.nombre_docente,
       grupo.segundo_nombre_docente,
@@ -539,7 +558,6 @@ export class GruposPage {
   }
 
   nombreDocenteCatalogo(docente: Docente): string {
-
     return [
       docente.nombre,
       docente.seg_nombre,
@@ -554,9 +572,7 @@ export class GruposPage {
   // ======================================
 
   colorEstado(estado: EstadoGrupo): string {
-
     switch (estado) {
-
       case 'Planeado':
         return 'warning';
 
@@ -582,7 +598,6 @@ export class GruposPage {
   cargarGrupos(
     refresher?: HTMLIonRefresherElement
   ): void {
-
     this.errorLista = '';
 
     if (!refresher) {
@@ -597,23 +612,21 @@ export class GruposPage {
     )
     .pipe(
       finalize(() => {
-
         this.cargando = false;
-
         void refresher?.complete();
-
         this.cdr.markForCheck();
       })
     )
     .subscribe({
-
       next: respuesta => {
+
+        const lista =
+          respuesta.grupos ?? respuesta.data;
 
         if (
           !respuesta.success ||
-          !Array.isArray(respuesta.grupos)
+          !Array.isArray(lista)
         ) {
-
           this.grupos = [];
 
           this.errorLista =
@@ -623,7 +636,7 @@ export class GruposPage {
           return;
         }
 
-        this.grupos = respuesta.grupos.map(
+        this.grupos = lista.map(
           grupo => this.normalizarGrupo(grupo)
         );
 
@@ -631,9 +644,7 @@ export class GruposPage {
       },
 
       error: (error: HttpErrorResponse) => {
-
         this.grupos = [];
-
         this.errorLista = this.mensajeError(error);
       }
     });
@@ -644,7 +655,6 @@ export class GruposPage {
   // ======================================
 
   refrescar(evento: Event): void {
-
     this.cargarGrupos(
       evento.target as HTMLIonRefresherElement
     );
@@ -656,7 +666,6 @@ export class GruposPage {
   // ======================================
 
   abrirDetalle(grupo: Grupo): void {
-
     if (this.cargandoDetalle) {
       return;
     }
@@ -675,21 +684,20 @@ export class GruposPage {
     )
     .pipe(
       finalize(() => {
-
         this.cargandoDetalle = false;
-
         this.cdr.markForCheck();
       })
     )
     .subscribe({
-
       next: respuesta => {
+
+        const encontrado =
+          respuesta.grupo ?? respuesta.data;
 
         if (
           !respuesta.success ||
-          !respuesta.grupo
+          !encontrado
         ) {
-
           this.errorDetalle =
             respuesta.message ||
             'No se pudo consultar el grupo.';
@@ -698,15 +706,13 @@ export class GruposPage {
         }
 
         this.seleccionado =
-          this.normalizarGrupo(respuesta.grupo);
+          this.normalizarGrupo(encontrado);
 
         this.vista = 'detalle';
-
         this.cdr.markForCheck();
       },
 
       error: (error: HttpErrorResponse) => {
-
         this.errorDetalle = this.mensajeError(error);
       }
     });
@@ -717,7 +723,6 @@ export class GruposPage {
   // ======================================
 
   nuevo(): void {
-
     if (!this.esAdmin) {
       return;
     }
@@ -731,7 +736,6 @@ export class GruposPage {
     this.errorCatalogos = '';
 
     this.vista = 'formulario';
-
     this.cargarCatalogos();
   }
 
@@ -740,7 +744,6 @@ export class GruposPage {
   // ======================================
 
   editar(): void {
-
     if (
       !this.esAdmin ||
       !this.seleccionado ||
@@ -756,8 +759,14 @@ export class GruposPage {
       clave_grupo: grupo.clave_grupo,
       capacidad: grupo.capacidad,
       semestre: grupo.semestre,
+
+      // NUEVOS CAMPOS
+      periodo: grupo.periodo,
+      anio: grupo.anio || null,
+
       id_materia: grupo.id_materia,
       id_docente: grupo.id_docente,
+
       modalidad: grupo.modalidad,
       estado: grupo.estado
     };
@@ -768,7 +777,6 @@ export class GruposPage {
     this.errorCatalogos = '';
 
     this.vista = 'formulario';
-
     this.cargarCatalogos();
   }
 
@@ -777,7 +785,6 @@ export class GruposPage {
   // ======================================
 
   regresar(): void {
-
     if (this.guardando || this.cancelando) {
       return;
     }
@@ -790,11 +797,8 @@ export class GruposPage {
       this.editando &&
       this.seleccionado
     ) {
-
       this.vista = 'detalle';
-
     } else {
-
       this.vista = 'lista';
     }
   }
@@ -804,14 +808,12 @@ export class GruposPage {
   // ======================================
 
   cargarCatalogos(): void {
-
     if (!this.esAdmin) {
       return;
     }
 
     this.cargandoCatalogos = true;
     this.catalogosListos = false;
-
     this.errorCatalogos = '';
 
     forkJoin({
@@ -833,14 +835,11 @@ export class GruposPage {
     })
     .pipe(
       finalize(() => {
-
         this.cargandoCatalogos = false;
-
         this.cdr.markForCheck();
       })
     )
     .subscribe({
-
       next: respuesta => {
 
         const listaMaterias =
@@ -855,7 +854,6 @@ export class GruposPage {
           !respuesta.materias.success ||
           !Array.isArray(listaMaterias)
         ) {
-
           this.errorCatalogos =
             respuesta.materias.message ||
             'No se pudieron cargar las materias.';
@@ -867,7 +865,6 @@ export class GruposPage {
           !respuesta.docentes.success ||
           !Array.isArray(listaDocentes)
         ) {
-
           this.errorCatalogos =
             respuesta.docentes.message ||
             'No se pudieron cargar los docentes.';
@@ -886,13 +883,12 @@ export class GruposPage {
         }));
 
         this.catalogosListos = true;
-
         this.cdr.markForCheck();
       },
 
       error: (error: HttpErrorResponse) => {
-
-        this.errorCatalogos = this.mensajeError(error);
+        this.errorCatalogos =
+          this.mensajeError(error);
 
         this.catalogosListos = false;
       }
@@ -918,12 +914,17 @@ export class GruposPage {
 
     const f = this.formulario;
 
-    const clave = f.clave_grupo
+    const clave = String(f.clave_grupo ?? '')
       .trim()
       .toUpperCase();
 
     const capacidad = Number(f.capacidad);
     const semestre = Number(f.semestre);
+
+    // NUEVOS CAMPOS
+    const periodo = String(f.periodo ?? '').trim();
+    const anio = Number(f.anio);
+
     const idMateria = Number(f.id_materia);
     const idDocente = Number(f.id_docente);
 
@@ -931,11 +932,7 @@ export class GruposPage {
     // VALIDAR CLAVE
     // ====================================
 
-    if (
-      !clave ||
-      clave.length > 20
-    ) {
-
+    if (!clave || clave.length > 20) {
       this.errorFormulario =
         'La clave es obligatoria y debe tener ' +
         'máximo 20 caracteres.';
@@ -952,7 +949,6 @@ export class GruposPage {
       !Number.isInteger(capacidad) ||
       capacidad <= 0
     ) {
-
       this.errorFormulario =
         'La capacidad debe ser un entero mayor que cero.';
 
@@ -969,9 +965,40 @@ export class GruposPage {
       semestre < 1 ||
       semestre > 20
     ) {
-
       this.errorFormulario =
         'El semestre debe estar entre 1 y 20.';
+
+      return;
+    }
+
+    // ====================================
+    // VALIDAR PERIODO (NUEVO)
+    // ====================================
+
+    if (
+      periodo === '' ||
+      periodo.length > 20
+    ) {
+      this.errorFormulario =
+        'El periodo es obligatorio y debe ' +
+        'tener máximo 20 caracteres.';
+
+      return;
+    }
+
+    // ====================================
+    // VALIDAR AÑO (NUEVO)
+    // ====================================
+
+    if (
+      f.anio === null ||
+      !Number.isInteger(anio) ||
+      anio < 1901 ||
+      anio > 2155
+    ) {
+      this.errorFormulario =
+        'El año debe ser un número válido ' +
+        'entre 1901 y 2155.';
 
       return;
     }
@@ -985,7 +1012,6 @@ export class GruposPage {
     );
 
     if (!materia) {
-
       this.errorFormulario =
         'Selecciona una materia válida.';
 
@@ -1001,7 +1027,6 @@ export class GruposPage {
     );
 
     if (!docente) {
-
       this.errorFormulario =
         'Selecciona un docente válido.';
 
@@ -1016,7 +1041,6 @@ export class GruposPage {
       f.modalidad !== 'Entre semana' &&
       f.modalidad !== 'Sabado'
     ) {
-
       this.errorFormulario =
         'Selecciona una modalidad válida.';
 
@@ -1028,7 +1052,6 @@ export class GruposPage {
     // ====================================
 
     if (!this.estadosPermitidos.includes(f.estado)) {
-
       this.errorFormulario =
         'El cambio de estado no está permitido.';
 
@@ -1044,19 +1067,21 @@ export class GruposPage {
       if (!this.seleccionado) {
         this.errorFormulario =
           'No se encontró el grupo para editar.';
+
         return;
       }
 
       if (this.seleccionado.estado === 'Cancelado') {
         this.errorFormulario =
           'Un grupo cancelado no puede modificarse.';
+
         return;
       }
 
       const original = this.seleccionado;
 
-      // Si se conocen dependencias, solamente
-      // se permite cambiar el docente.
+      // Si tiene dependencias, solamente
+      // puede cambiarse el docente.
 
       if (this.grupoConDependencias) {
 
@@ -1064,12 +1089,16 @@ export class GruposPage {
           clave !== original.clave_grupo ||
           capacidad !== original.capacidad ||
           semestre !== original.semestre ||
+
+          // NUEVOS CAMPOS
+          periodo !== original.periodo ||
+          anio !== original.anio ||
+
           idMateria !== original.id_materia ||
           f.modalidad !== original.modalidad ||
           f.estado !== original.estado;
 
         if (cambioRestringido) {
-
           this.errorFormulario =
             'Este grupo tiene horarios o alumnos cursando. ' +
             'Solamente puede cambiarse el docente.';
@@ -1082,7 +1111,6 @@ export class GruposPage {
         capacidad <
         Number(original.alumnos_cursando ?? 0)
       ) {
-
         this.errorFormulario =
           'La capacidad no puede ser menor ' +
           'que los alumnos cursando.';
@@ -1107,8 +1135,14 @@ export class GruposPage {
       clave_grupo: clave,
       capacidad,
       semestre,
+
+      // NUEVOS CAMPOS
+      periodo,
+      anio,
+
       id_materia: idMateria,
       id_docente: idDocente,
+
       modalidad: f.modalidad,
       estado: f.estado
     };
@@ -1119,10 +1153,6 @@ export class GruposPage {
 
     this.guardando = true;
 
-    // ====================================
-    // ENVIAR A LA API
-    // ====================================
-
     this.http.post<RespuestaApi>(
       `${this.api}/grupos/${accion}.php`,
       cuerpo,
@@ -1132,18 +1162,14 @@ export class GruposPage {
     )
     .pipe(
       finalize(() => {
-
         this.guardando = false;
-
         this.cdr.markForCheck();
       })
     )
     .subscribe({
-
       next: respuesta => {
 
         if (!respuesta.success) {
-
           this.errorFormulario =
             respuesta.message ||
             'No se pudo guardar el grupo.';
@@ -1163,7 +1189,6 @@ export class GruposPage {
       },
 
       error: (error: HttpErrorResponse) => {
-
         this.errorFormulario =
           this.mensajeError(error);
       }
@@ -1190,17 +1215,14 @@ export class GruposPage {
         this.seleccionado.alumnos_cursando ?? 0
       ) > 0
     ) {
-
       await this.mostrarToast(
         'No puedes cancelar un grupo con alumnos cursando.',
         'danger'
       );
-
       return;
     }
 
     const alerta = await this.alertas.create({
-
       header: 'Cancelar grupo',
 
       message:
@@ -1251,24 +1273,19 @@ export class GruposPage {
     )
     .pipe(
       finalize(() => {
-
         this.cancelando = false;
-
         this.cdr.markForCheck();
       })
     )
     .subscribe({
-
       next: respuesta => {
 
         if (!respuesta.success) {
-
           void this.mostrarToast(
             respuesta.message ||
             'No se pudo cancelar el grupo.',
             'danger'
           );
-
           return;
         }
 
@@ -1284,7 +1301,6 @@ export class GruposPage {
       },
 
       error: (error: HttpErrorResponse) => {
-
         void this.mostrarToast(
           this.mensajeError(error),
           'danger'
@@ -1302,7 +1318,6 @@ export class GruposPage {
   ): string {
 
     if (error.status === 0) {
-
       return (
         'No fue posible conectar con la API. ' +
         'Verifica el nombre del archivo PHP, ' +
@@ -1321,8 +1336,11 @@ export class GruposPage {
     if (
       typeof error.error?.message === 'string'
     ) {
-
       return error.error.message;
+    }
+
+    if (error.status === 400) {
+      return 'PHP rechazó los datos enviados.';
     }
 
     return `Error del servidor (${error.status}).`;

@@ -25,7 +25,6 @@
     </ion-buttons>
 
     <ion-title>
-
       {{
         vista === 'lista'
           ? 'Grupos'
@@ -35,7 +34,6 @@
           ? 'Editar grupo'
           : 'Nuevo grupo'
       }}
-
     </ion-title>
 
     <ion-buttons
@@ -83,7 +81,7 @@
 
       <p>
         Consulta los grupos, sus docentes,
-        materias y disponibilidad.
+        materias, periodos y disponibilidad.
       </p>
 
       <!-- BUSCADOR -->
@@ -92,7 +90,7 @@
         name="busqueda"
         [(ngModel)]="busqueda"
         [debounce]="200"
-        placeholder="Buscar grupo, materia o docente">
+        placeholder="Buscar grupo, materia, periodo o docente">
       </ion-searchbar>
 
       <!-- FILTRO -->
@@ -234,6 +232,17 @@
             {{ nombreMateria(grupo) }}
           </p>
 
+          <!-- PERIODO Y AÑO -->
+
+          <p>
+            Periodo:
+            {{ grupo.periodo || 'Sin especificar' }}
+
+            <ng-container *ngIf="grupo.anio">
+              · {{ grupo.anio }}
+            </ng-container>
+          </p>
+
           <p>
             Semestre {{ grupo.semestre }}
             ·
@@ -305,7 +314,7 @@
 
 
   <!-- ================================= -->
-  <!-- DETALLE DE GRUPO -->
+  <!-- DETALLE DEL GRUPO -->
   <!-- ================================= -->
 
   <ng-container
@@ -332,36 +341,74 @@
       <ion-list [inset]="true">
 
         <ion-item>
+
           <ion-label>
             <h3>Identificador</h3>
             <p>{{ grupo.id_grupo }}</p>
           </ion-label>
+
         </ion-item>
 
         <ion-item>
+
           <ion-label>
             <h3>Clave</h3>
             <p>{{ grupo.clave_grupo }}</p>
           </ion-label>
+
+        </ion-item>
+
+        <!-- NUEVO: PERIODO -->
+
+        <ion-item>
+
+          <ion-label>
+            <h3>Periodo escolar</h3>
+
+            <p>
+              {{ grupo.periodo || 'Sin especificar' }}
+            </p>
+          </ion-label>
+
+        </ion-item>
+
+        <!-- NUEVO: AÑO -->
+
+        <ion-item>
+
+          <ion-label>
+            <h3>Año escolar</h3>
+
+            <p>
+              {{ grupo.anio || 'Sin especificar' }}
+            </p>
+          </ion-label>
+
         </ion-item>
 
         <ion-item>
+
           <ion-label>
             <h3>Semestre</h3>
             <p>{{ grupo.semestre }}</p>
           </ion-label>
+
         </ion-item>
 
         <ion-item>
+
           <ion-label>
             <h3>Capacidad</h3>
             <p>{{ grupo.capacidad }} alumnos</p>
           </ion-label>
+
         </ion-item>
 
         <ion-item>
+
           <ion-label>
             <h3>Modalidad</h3>
+
             <p>
               {{
                 grupo.modalidad === 'Sabado'
@@ -369,14 +416,18 @@
                   : grupo.modalidad
               }}
             </p>
+
           </ion-label>
+
         </ion-item>
 
         <ion-item>
+
           <ion-label>
             <h3>Estado</h3>
             <p>{{ grupo.estado }}</p>
           </ion-label>
+
         </ion-item>
 
       </ion-list>
@@ -418,7 +469,8 @@
             </p>
 
             <p *ngIf="grupo.estado_materia">
-              Estado: {{ grupo.estado_materia }}
+              Estado:
+              {{ grupo.estado_materia }}
             </p>
 
           </ion-label>
@@ -460,7 +512,8 @@
             </p>
 
             <p *ngIf="grupo.estado_docente">
-              Estado: {{ grupo.estado_docente }}
+              Estado:
+              {{ grupo.estado_docente }}
             </p>
 
           </ion-label>
@@ -477,10 +530,12 @@
       <ion-list [inset]="true">
 
         <ion-item>
+
           <ion-label>
             <h3>Capacidad total</h3>
             <p>{{ grupo.capacidad }}</p>
           </ion-label>
+
         </ion-item>
 
         <ion-item
@@ -498,7 +553,10 @@
 
           <ion-label>
             <h3>Lugares disponibles</h3>
-            <p>{{ lugaresDisponibles(grupo) }}</p>
+
+            <p>
+              {{ lugaresDisponibles(grupo) }}
+            </p>
           </ion-label>
 
         </ion-item>
@@ -508,7 +566,10 @@
 
           <ion-label>
             <h3>Horarios registrados</h3>
-            <p>{{ grupo.total_horarios }}</p>
+
+            <p>
+              {{ grupo.total_horarios }}
+            </p>
           </ion-label>
 
         </ion-item>
@@ -699,6 +760,44 @@
         </ion-item>
 
 
+        <!-- NUEVO: PERIODO -->
+
+        <ion-item>
+
+          <ion-input
+            name="periodo"
+            label="Periodo escolar *"
+            labelPlacement="stacked"
+            [(ngModel)]="formulario.periodo"
+            [maxlength]="20"
+            [readonly]="grupoConDependencias"
+            placeholder="Ej. Agosto-Diciembre">
+          </ion-input>
+
+        </ion-item>
+
+
+        <!-- NUEVO: AÑO -->
+
+        <ion-item>
+
+          <ion-input
+            name="anio"
+            label="Año escolar *"
+            labelPlacement="stacked"
+            type="number"
+            inputmode="numeric"
+            min="1901"
+            max="2155"
+            step="1"
+            [(ngModel)]="formulario.anio"
+            [readonly]="grupoConDependencias"
+            placeholder="Ej. 2026">
+          </ion-input>
+
+        </ion-item>
+
+
         <!-- MODALIDAD -->
 
         <ion-item>
@@ -748,7 +847,10 @@
             <ion-select-option
               *ngFor="let materia of materiasDisponibles"
               [value]="materia.id_materia"
-              [disabled]="materia.estado !== 'Activa'">
+              [disabled]="
+                materia.estado !== 'Activa' &&
+                materia.id_materia !== seleccionado?.id_materia
+              ">
 
               {{ materia.clave_materia }}
               · {{ materia.nombre }}
@@ -781,7 +883,10 @@
             <ion-select-option
               *ngFor="let docente of docentesDisponibles"
               [value]="docente.id_docente"
-              [disabled]="docente.estado !== 'Activo'">
+              [disabled]="
+                docente.estado !== 'Activo' &&
+                docente.id_docente !== seleccionado?.id_docente
+              ">
 
               {{ docente.codigo }}
               · {{ nombreDocenteCatalogo(docente) }}
