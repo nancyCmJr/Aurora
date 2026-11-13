@@ -228,7 +228,7 @@ export class UsuariosPage {
     this.errorListado = '';
     if (!refresher) this.cargando = true;
 
-    this.http.get<RespuestaListado>(url)
+    this.http.get<RespuestaListado>(url, { withCredentials: true })
       .pipe(finalize(() => {
         this.cargando = false;
         void refresher?.complete();
@@ -304,6 +304,7 @@ export class UsuariosPage {
 
     this.http.get<RespuestaConsulta>(`${this.apiUrl}/consultar.php`, {
       params: { codigo: usuario.codigo },
+      withCredentials: true,
     }).pipe(finalize(() => {
       this.cargandoDetalle = false;
       this.cdr.markForCheck();
@@ -409,7 +410,7 @@ export class UsuariosPage {
     const endpoint = this.editando ? 'actualizar.php' : 'registrar.php';
     this.guardando = true;
 
-    this.http.post<RespuestaOperacion>(`${this.apiUrl}/${endpoint}`, datos)
+    this.http.post<RespuestaOperacion>(`${this.apiUrl}/${endpoint}`, datos, { withCredentials: true })
       .pipe(finalize(() => {
         this.guardando = false;
         this.cdr.markForCheck();
@@ -457,7 +458,7 @@ export class UsuariosPage {
     this.errorFormulario = '';
     this.http.post<RespuestaOperacion>(`${this.apiUrl}/eliminar.php`, {
       codigo: this.formulario.codigo,
-    }).pipe(finalize(() => {
+    }, { withCredentials: true }).pipe(finalize(() => {
       this.desactivando = false;
       this.cdr.markForCheck();
     }))

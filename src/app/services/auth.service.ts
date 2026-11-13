@@ -46,7 +46,7 @@ export class AuthService {
     return this.http.post<LoginResponse>(`${this.apiUrl}/auth/login.php`, {
       correo: correo.trim().toLowerCase(),
       contra,
-    }).pipe(
+    }, { withCredentials: true }).pipe(
       tap((respuesta) => {
         const usuario = respuesta.success && this.esUsuarioValido(respuesta.data)
           ? respuesta.data
