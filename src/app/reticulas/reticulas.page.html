@@ -1,13 +1,936 @@
+
 <ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title>reticulas</ion-title>
+
+  <ion-toolbar color="primary">
+
+    <ion-buttons slot="start">
+
+      <ion-back-button
+        *ngIf="vista === 'lista'"
+        defaultHref="/home">
+      </ion-back-button>
+
+      <ion-button
+        *ngIf="vista !== 'lista'"
+        (click)="regresar()"
+        aria-label="Regresar">
+
+        <ion-icon
+          slot="icon-only"
+          name="arrow-back-outline">
+        </ion-icon>
+
+      </ion-button>
+
+    </ion-buttons>
+
+    <ion-title>
+      {{
+        vista === 'lista'
+          ? 'Retículas'
+          : vista === 'detalle'
+          ? 'Plan de estudios'
+          : vista === 'asignacion'
+          ? 'Asignar materia'
+          : editando
+          ? 'Editar retícula'
+          : 'Nueva retícula'
+      }}
+    </ion-title>
+
+    <ion-buttons
+      slot="end"
+      *ngIf="vista === 'lista'">
+
+      <ion-button
+        (click)="nueva()"
+        aria-label="Registrar retícula">
+
+        <ion-icon
+          slot="icon-only"
+          name="add-outline">
+        </ion-icon>
+
+      </ion-button>
+
+    </ion-buttons>
+
   </ion-toolbar>
+
 </ion-header>
 
+
 <ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">reticulas</ion-title>
-    </ion-toolbar>
-  </ion-header>
+
+  <!-- ================================= -->
+  <!-- LISTADO DE RETÍCULAS -->
+  <!-- ================================= -->
+
+  <ng-container *ngIf="vista === 'lista'">
+
+    <ion-refresher
+      slot="fixed"
+      (ionRefresh)="refrescar($event)">
+
+      <ion-refresher-content>
+      </ion-refresher-content>
+
+    </ion-refresher>
+
+    <div class="ion-padding">
+
+      <h2>Retículas registradas</h2>
+
+      <p>
+        Consulta los planes de estudio por carrera y año.
+      </p>
+
+      <!-- BUSCADOR -->
+
+      <ion-searchbar
+        name="busqueda"
+        [(ngModel)]="busqueda"
+        placeholder="Buscar por carrera o año"
+        [debounce]="200">
+      </ion-searchbar>
+
+      <!-- FILTRO -->
+
+      <ion-item>
+
+        <ion-select
+          name="filtro"
+          label="Estado"
+          labelPlacement="stacked"
+          interface="action-sheet"
+          [(ngModel)]="filtro">
+
+          <ion-select-option value="Todas">
+            Todas
+          </ion-select-option>
+
+          <ion-select-option value="Vigente">
+            Vigentes
+          </ion-select-option>
+
+          <ion-select-option value="No vigente">
+            No vigentes
+          </ion-select-option>
+
+        </ion-select>
+
+      </ion-item>
+
+      <ion-note
+        *ngIf="!cargando && !errorLista">
+
+        {{ reticulasFiltradas.length }}
+        retícula(s) encontrada(s)
+
+      </ion-note>
+
+    </div>
+
+    <!-- CARGANDO -->
+
+    <div
+      *ngIf="cargando"
+      class="ion-padding ion-text-center">
+
+      <ion-spinner name="crescent">
+      </ion-spinner>
+
+      <p>Cargando retículas...</p>
+
+    </div>
+
+    <!-- ERROR AL LISTAR -->
+
+    <ion-text
+      color="danger"
+      *ngIf="errorLista">
+
+      <p class="ion-padding" role="alert">
+        {{ errorLista }}
+      </p>
+
+    </ion-text>
+
+    <ion-button
+      *ngIf="errorLista && !cargando"
+      expand="block"
+      fill="outline"
+      (click)="cargarReticulas()">
+
+      Reintentar
+
+    </ion-button>
+
+    <!-- LISTADO -->
+
+    <ion-list
+      [inset]="true"
+      *ngIf="!cargando && !errorLista">
+
+      <ion-item
+        *ngFor="let r of reticulasFiltradas"
+        button
+        detail="true"
+        (click)="abrirDetalle(r)">
+
+        <ion-icon
+          slot="start"
+          name="book-outline"
+          color="primary">
+        </ion-icon>
+
+        <ion-label>
+
+          <h2>
+            {{ nombreCarrera(r) }}
+          </h2>
+
+          <p>
+            Plan {{ r.anio }}
+            · Retícula #{{ r.id_reticula }}
+          </p>
+
+          <p *ngIf="r.total_materias != null">
+            {{ r.total_materias }} materias asignadas
+          </p>
+
+          <ion-badge
+            [color]="
+              r.estado === 'Vigente'
+                ? 'success'
+                : 'medium'
+            ">
+
+            {{ r.estado }}
+
+          </ion-badge>
+
+        </ion-label>
+
+      </ion-item>
+
+    </ion-list>
+
+    <!-- SIN RESULTADOS -->
+
+    <div
+      class="ion-padding ion-text-center"
+      *ngIf="
+        !cargando &&
+        !errorLista &&
+        reticulasFiltradas.length === 0
+      ">
+
+      <p>
+        No hay retículas que coincidan con la búsqueda.
+      </p>
+
+      <ion-button
+        fill="outline"
+        (click)="nueva()">
+
+        Registrar retícula
+
+      </ion-button>
+
+    </div>
+
+  </ng-container>
+
+
+  <!-- ================================= -->
+  <!-- DETALLE DE RETÍCULA -->
+  <!-- ================================= -->
+
+  <ng-container
+    *ngIf="vista === 'detalle' && seleccionada as r">
+
+    <div class="ion-padding">
+
+      <h2>
+        {{ nombreCarrera(r) }}
+      </h2>
+
+      <p>
+        Plan de estudios {{ r.anio }}
+      </p>
+
+      <ion-badge
+        [color]="
+          r.estado === 'Vigente'
+            ? 'success'
+            : 'medium'
+        ">
+
+        {{ r.estado }}
+
+      </ion-badge>
+
+      <!-- DATOS GENERALES -->
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+
+          <ion-label>
+
+            <h3>Identificador de retícula</h3>
+            <p>{{ r.id_reticula }}</p>
+
+          </ion-label>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-label>
+
+            <h3>Año del plan</h3>
+            <p>{{ r.anio }}</p>
+
+          </ion-label>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-label>
+
+            <h3>Carrera</h3>
+            <p>{{ nombreCarrera(r) }}</p>
+
+          </ion-label>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-label>
+
+            <h3>Materias asignadas</h3>
+            <p>{{ totalMaterias }}</p>
+
+          </ion-label>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-label>
+
+            <h3>Créditos asignados</h3>
+
+            <p>
+              {{ creditosAsignados }}
+
+              {{
+                limiteCreditos !== null
+                  ? ' / ' + limiteCreditos
+                  : ''
+              }}
+            </p>
+
+          </ion-label>
+
+        </ion-item>
+
+      </ion-list>
+
+      <!-- ERROR DEL DETALLE -->
+
+      <ion-text
+        color="danger"
+        *ngIf="errorDetalle">
+
+        <p role="alert">
+          {{ errorDetalle }}
+        </p>
+
+      </ion-text>
+
+      <!-- EDITAR -->
+
+      <ion-button
+        expand="block"
+        fill="outline"
+        (click)="editar()">
+
+        <ion-icon
+          name="create-outline"
+          slot="start">
+        </ion-icon>
+
+        Editar retícula
+
+      </ion-button>
+
+      <!-- ASIGNAR MATERIA -->
+
+      <ion-button
+        expand="block"
+        *ngIf="r.estado === 'Vigente'"
+        (click)="abrirAsignacion()"
+        [disabled]="cargandoDetalle">
+
+        <ion-icon
+          name="add-outline"
+          slot="start">
+        </ion-icon>
+
+        Asignar materia
+
+      </ion-button>
+
+      <!-- DESACTIVAR -->
+
+      <ion-button
+        expand="block"
+        color="danger"
+        fill="outline"
+        *ngIf="r.estado === 'Vigente'"
+        (click)="confirmarDesactivacion()"
+        [disabled]="desactivando">
+
+        <ion-icon
+          name="ban-outline"
+          slot="start">
+        </ion-icon>
+
+        Marcar como no vigente
+
+      </ion-button>
+
+      <!-- REACTIVACIÓN -->
+
+      <ion-note
+        *ngIf="r.estado === 'No vigente'">
+
+        Para reactivar esta retícula, entra
+        en «Editar retícula» y cambia el estado.
+
+      </ion-note>
+
+      <!-- MATERIAS ASIGNADAS -->
+
+      <h3>Materias del plan</h3>
+
+      <ion-item>
+
+        <ion-select
+          name="filtroSemestre"
+          label="Mostrar semestre"
+          labelPlacement="stacked"
+          interface="action-sheet"
+          [(ngModel)]="filtroSemestre">
+
+          <ion-select-option value="Todos">
+            Todos
+          </ion-select-option>
+
+          <ion-select-option
+            *ngFor="let n of semestres"
+            [value]="n">
+
+            Semestre {{ n }}
+
+          </ion-select-option>
+
+        </ion-select>
+
+      </ion-item>
+
+      <!-- CARGANDO -->
+
+      <div
+        *ngIf="cargandoDetalle"
+        class="ion-padding ion-text-center">
+
+        <ion-spinner name="crescent">
+        </ion-spinner>
+
+        <p>Cargando materias...</p>
+
+      </div>
+
+      <!-- LISTA DE MATERIAS -->
+
+      <ion-list
+        [inset]="true"
+        *ngIf="!cargandoDetalle && !errorDetalle">
+
+        <ion-item
+          *ngFor="let m of materiasVisibles">
+
+          <ion-icon
+            slot="start"
+            name="book-outline"
+            color="primary">
+          </ion-icon>
+
+          <ion-label>
+
+            <h2>{{ m.nombre }}</h2>
+
+            <p>
+              {{ m.clave_materia }}
+              · Semestre {{ m.semestre }}
+            </p>
+
+            <p>
+              {{ m.creditos }} créditos
+            </p>
+
+            <p *ngIf="m.prerrequisito">
+
+              Requiere:
+              {{ m.prerrequisito.nombre }}
+
+            </p>
+
+            <p
+              *ngIf="
+                m.nombre_requisito &&
+                !m.prerrequisito
+              ">
+
+              Requiere:
+              {{ m.nombre_requisito }}
+
+            </p>
+
+            <ion-note
+              color="danger"
+              *ngIf="m.mensaje_validacion">
+
+              {{ m.mensaje_validacion }}
+
+            </ion-note>
+
+          </ion-label>
+
+          <!-- QUITAR MATERIA -->
+
+          <ion-button
+            slot="end"
+            fill="clear"
+            color="danger"
+            *ngIf="r.estado === 'Vigente'"
+            (click)="confirmarQuitar(m)"
+            [disabled]="quitando"
+            aria-label="Quitar materia">
+
+            <ion-icon
+              slot="icon-only"
+              name="trash-outline">
+            </ion-icon>
+
+          </ion-button>
+
+        </ion-item>
+
+      </ion-list>
+
+      <!-- SIN MATERIAS -->
+
+      <p
+        *ngIf="
+          !cargandoDetalle &&
+          !errorDetalle &&
+          materiasVisibles.length === 0
+        "
+        class="ion-text-center">
+
+        No hay materias asignadas para este filtro.
+
+      </p>
+
+    </div>
+
+  </ng-container>
+
+
+  <!-- ================================= -->
+  <!-- FORMULARIO NUEVO / EDITAR -->
+  <!-- ================================= -->
+
+  <ng-container *ngIf="vista === 'formulario'">
+
+    <div class="ion-padding">
+
+      <p>
+        {{
+          editando
+            ? 'Actualiza los datos del plan de estudios.'
+            : 'Registra un nuevo plan de estudios para una carrera.'
+        }}
+      </p>
+
+      <h3>Datos de la retícula</h3>
+
+      <ion-list [inset]="true">
+
+        <!-- AÑO -->
+
+        <ion-item>
+
+          <ion-input
+            name="anio"
+            label="Año del plan *"
+            labelPlacement="stacked"
+            type="number"
+            inputmode="numeric"
+            [min]="1901"
+            [max]="2155"
+            [(ngModel)]="formulario.anio"
+            placeholder="Ej. 2026">
+          </ion-input>
+
+        </ion-item>
+
+        <!-- CARRERA -->
+
+        <ion-item>
+
+          <ion-select
+            name="id_carrera"
+            label="Carrera *"
+            labelPlacement="stacked"
+            interface="alert"
+            [(ngModel)]="formulario.id_carrera"
+            [disabled]="
+              cargandoCarreras ||
+              (editando && materiasAsignadas.length > 0)
+            ">
+
+            <ion-select-option
+              *ngFor="let c of carreras"
+              [value]="c.id_carrera"
+              [disabled]="
+                c.estado !== 'Activa' &&
+                c.id_carrera !== formulario.id_carrera
+              ">
+
+              {{ c.nombre }}
+
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+        <!-- ESTADO -->
+
+        <ion-item>
+
+          <ion-select
+            name="estado"
+            label="Estado"
+            labelPlacement="stacked"
+            interface="action-sheet"
+            [(ngModel)]="formulario.estado">
+
+            <ion-select-option value="Vigente">
+              Vigente
+            </ion-select-option>
+
+            <ion-select-option value="No vigente">
+              No vigente
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+      </ion-list>
+
+      <ion-note
+        *ngIf="
+          editando &&
+          materiasAsignadas.length > 0
+        ">
+
+        No se puede cambiar la carrera mientras
+        existan materias asignadas.
+
+      </ion-note>
+
+      <!-- ERROR DE CARRERAS -->
+
+      <ion-text
+        color="danger"
+        *ngIf="errorCarreras">
+
+        <p role="alert">
+          {{ errorCarreras }}
+        </p>
+
+      </ion-text>
+
+      <ion-button
+        *ngIf="errorCarreras"
+        fill="clear"
+        size="small"
+        (click)="cargarCarreras()">
+
+        Reintentar cargar carreras
+
+      </ion-button>
+
+      <ion-note>
+        Los campos marcados con * son obligatorios.
+      </ion-note>
+
+      <!-- ERROR DEL FORMULARIO -->
+
+      <ion-text
+        color="danger"
+        *ngIf="errorFormulario">
+
+        <p role="alert">
+          {{ errorFormulario }}
+        </p>
+
+      </ion-text>
+
+      <!-- GUARDAR -->
+
+      <ion-button
+        expand="block"
+        (click)="guardar()"
+        [disabled]="guardando || cargandoCarreras">
+
+        <ion-spinner
+          *ngIf="guardando"
+          slot="start"
+          name="crescent">
+        </ion-spinner>
+
+        <ion-icon
+          *ngIf="!guardando"
+          slot="start"
+          name="save-outline">
+        </ion-icon>
+
+        {{
+          guardando
+            ? 'Guardando...'
+            : editando
+            ? 'Guardar cambios'
+            : 'Registrar retícula'
+        }}
+
+      </ion-button>
+
+      <!-- CANCELAR -->
+
+      <ion-button
+        expand="block"
+        fill="clear"
+        (click)="regresar()"
+        [disabled]="guardando">
+
+        Cancelar
+
+      </ion-button>
+
+    </div>
+
+  </ng-container>
+
+
+  <!-- ================================= -->
+  <!-- ASIGNAR MATERIA -->
+  <!-- ================================= -->
+
+  <ng-container
+    *ngIf="vista === 'asignacion' && seleccionada as r">
+
+    <div class="ion-padding">
+
+      <h2>Asignar materia</h2>
+
+      <p>
+        {{ nombreCarrera(r) }}
+        · Plan {{ r.anio }}
+      </p>
+
+      <p>
+        Materias asignadas: {{ totalMaterias }}
+      </p>
+
+      <p *ngIf="limiteCreditos !== null">
+        Créditos: {{ creditosAsignados }}
+        de {{ limiteCreditos }}
+      </p>
+
+      <ion-list [inset]="true">
+
+        <!-- SELECCIONAR MATERIA -->
+
+        <ion-item>
+
+          <ion-select
+            name="materiaParaAsignar"
+            label="Materia *"
+            labelPlacement="stacked"
+            interface="alert"
+            [(ngModel)]="materiaParaAsignar"
+            [disabled]="cargandoCatalogo">
+
+            <ion-select-option
+              *ngFor="let m of materiasDisponibles"
+              [value]="m.id_materia">
+
+              {{ m.clave_materia }}
+              · {{ m.nombre }}
+              ({{ m.creditos }} cr.)
+
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+        <!-- SELECCIONAR SEMESTRE -->
+
+        <ion-item>
+
+          <ion-select
+            name="semestreParaAsignar"
+            label="Semestre *"
+            labelPlacement="stacked"
+            interface="action-sheet"
+            [(ngModel)]="semestreParaAsignar">
+
+            <ion-select-option
+              *ngFor="let n of semestres"
+              [value]="n">
+
+              Semestre {{ n }}
+
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+      </ion-list>
+
+      <!-- CARGANDO CATÁLOGO -->
+
+      <div
+        *ngIf="cargandoCatalogo"
+        class="ion-padding ion-text-center">
+
+        <ion-spinner name="crescent">
+        </ion-spinner>
+
+        <p>Cargando materias...</p>
+
+      </div>
+
+      <!-- ERROR DE CATÁLOGO -->
+
+      <ion-text
+        color="danger"
+        *ngIf="errorCatalogo">
+
+        <p role="alert">
+          {{ errorCatalogo }}
+        </p>
+
+      </ion-text>
+
+      <ion-button
+        *ngIf="errorCatalogo"
+        fill="clear"
+        (click)="cargarCatalogo()">
+
+        Reintentar cargar materias
+
+      </ion-button>
+
+      <!-- SIN MATERIAS DISPONIBLES -->
+
+      <p
+        *ngIf="
+          !cargandoCatalogo &&
+          !errorCatalogo &&
+          materiasDisponibles.length === 0
+        ">
+
+        No hay materias activas disponibles para agregar.
+
+      </p>
+
+      <ion-note>
+        El servidor comprueba el límite de créditos
+        y los prerrequisitos antes de guardar.
+      </ion-note>
+
+      <!-- ERROR DE ASIGNACIÓN -->
+
+      <ion-text
+        color="danger"
+        *ngIf="errorAsignacion">
+
+        <p role="alert">
+          {{ errorAsignacion }}
+        </p>
+
+      </ion-text>
+
+      <!-- AGREGAR AL PLAN -->
+
+      <ion-button
+        expand="block"
+        (click)="asignarMateria()"
+        [disabled]="
+          asignando ||
+          cargandoCatalogo ||
+          !!errorCatalogo ||
+          materiasDisponibles.length === 0
+        ">
+
+        <ion-spinner
+          *ngIf="asignando"
+          name="crescent"
+          slot="start">
+        </ion-spinner>
+
+        <ion-icon
+          *ngIf="!asignando"
+          name="add-outline"
+          slot="start">
+        </ion-icon>
+
+        {{
+          asignando
+            ? 'Asignando...'
+            : 'Agregar al plan'
+        }}
+
+      </ion-button>
+
+      <!-- CANCELAR -->
+
+      <ion-button
+        expand="block"
+        fill="clear"
+        (click)="regresar()"
+        [disabled]="asignando">
+
+        Cancelar
+
+      </ion-button>
+
+    </div>
+
+  </ng-container>
+
 </ion-content>
