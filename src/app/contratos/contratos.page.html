@@ -1,13 +1,424 @@
-<ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title>contratos</ion-title>
+
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-button (click)="volver()">
+        <ion-icon name="arrow-back-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+
+    <ion-title>
+      {{ vista === 'lista' ? 'Contratos' :
+         vista === 'detalle' ? 'Detalle de contrato' :
+         editando ? 'Editar contrato' : 'Nuevo contrato' }}
+    </ion-title>
+
+    <ion-buttons slot="end">
+      <ion-button
+        *ngIf="vista === 'lista'"
+        (click)="cargarDatos()"
+        [disabled]="cargando">
+        <ion-icon name="refresh-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
-<ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">contratos</ion-title>
-    </ion-toolbar>
-  </ion-header>
+<ion-content class="ion-padding">
+
+  <div class="contenedor">
+
+    <!-- =========================
+         LISTADO
+    ========================== -->
+
+    <ng-container *ngIf="vista === 'lista'">
+
+      <div class="cabecera">
+        <div>
+          <h1>Gestión de contratos</h1>
+          <p>Administración de contratos del personal docente</p>
+        </div>
+
+        <ion-button (click)="nuevoContrato()">
+          <ion-icon name="add-outline" slot="start"></ion-icon>
+          Nuevo contrato
+        </ion-button>
+      </div>
+
+      <div class="estadisticas">
+        <div class="estadistica">
+          <span>Total</span>
+          <strong>{{ contratos.length }}</strong>
+        </div>
+
+        <div class="estadistica">
+          <span>Activos</span>
+          <strong class="verde">{{ totalActivos }}</strong>
+        </div>
+
+        <div class="estadistica">
+          <span>Inactivos</span>
+          <strong>{{ totalInactivos }}</strong>
+        </div>
+
+        <div class="estadistica">
+          <span>Vencidos</span>
+          <strong class="naranja">{{ totalVencidos }}</strong>
+        </div>
+      </div>
+
+      <div class="filtros">
+        <ion-searchbar
+          [(ngModel)]="busqueda"
+          [debounce]="200"
+          placeholder="Buscar folio, docente, área o rol">
+        </ion-searchbar>
+
+        <ion-item lines="none" class="selector-filtro">
+          <ion-select
+            label="Estado"
+            labelPlacement="stacked"
+            [(ngModel)]="filtroEstado">
+            <ion-select-option value="Todos">
+              Todos
+            </ion-select-option>
+            <ion-select-option value="Activo">
+              Activo
+            </ion-select-option>
+            <ion-select-option value="Inactivo">
+              Inactivo
+            </ion-select-option>
+            <ion-select-option value="Vencido">
+              Vencido
+            </ion-select-option>
+          </ion-select>
+        </ion-item>
+      </div>
+
+      <div class="centrado" *ngIf="cargando">
+        <ion-spinner name="crescent"></ion-spinner>
+        <p>Cargando contratos...</p>
+      </div>
+
+      <div
+        class="centrado"
+        *ngIf="!cargando && contratosFiltrados.length === 0">
+        <ion-icon name="document-text-outline"></ion-icon>
+        <p>No se encontraron contratos.</p>
+      </div>
+
+      <ion-card
+        class="contrato-card"
+        *ngFor="let c of contratosFiltrados; trackBy: trackById">
+
+        <ion-card-content>
+          <div class="contrato-encabezado">
+            <div>
+              <h2>{{ c.folio_contrato }}</h2>
+              <p>{{ nombreDocente(c) }}</p>
+            </div>
+
+            <ion-badge [color]="colorEstado(c.status)">
+              {{ c.status }}
+            </ion-badge>
+          </div>
+
+          <div class="contrato-datos">
+            <div>
+              <span>Área</span>
+              <strong>{{ nombreArea(c) }}</strong>
+            </div>
+
+            <div>
+              <span>Rol</span>
+              <strong>{{ c.rol }}</strong>
+            </div>
+
+            <div>
+              <span>Horas</span>
+              <strong>{{ c.horas }}</strong>
+            </div>
+
+            <div>
+              <span>Inicio</span>
+              <strong>
+                {{ c.fecha_inicio | date:'dd/MM/yyyy' }}
+              </strong>
+            </div>
+          </div>
+
+          <ion-button
+            expand="block"
+            fill="outline"
+            (click)="verDetalle(c)">
+            Ver detalles
+          </ion-button>
+        </ion-card-content>
+      </ion-card>
+
+    </ng-container>
+
+    <!-- =========================
+         DETALLE
+    ========================== -->
+
+    <ng-container *ngIf="vista === 'detalle' && seleccionado">
+
+      <div class="centrado" *ngIf="cargandoDetalle">
+        <ion-spinner name="crescent"></ion-spinner>
+      </div>
+
+      <ng-container *ngIf="!cargandoDetalle">
+        <ion-card>
+          <ion-card-header>
+            <div class="contrato-encabezado">
+              <div>
+                <ion-card-title>
+                  {{ seleccionado.folio_contrato }}
+                </ion-card-title>
+                <p>Información del contrato</p>
+              </div>
+
+              <ion-badge [color]="colorEstado(seleccionado.status)">
+                {{ seleccionado.status }}
+              </ion-badge>
+            </div>
+          </ion-card-header>
+
+          <ion-card-content>
+            <div class="detalle-grid">
+              <div>
+                <span>ID de contrato</span>
+                <strong>{{ seleccionado.id_contrato }}</strong>
+              </div>
+
+              <div>
+                <span>Docente</span>
+                <strong>{{ nombreDocente(seleccionado) }}</strong>
+              </div>
+
+              <div>
+                <span>Área</span>
+                <strong>{{ nombreArea(seleccionado) }}</strong>
+              </div>
+
+              <div>
+                <span>Rol</span>
+                <strong>{{ seleccionado.rol }}</strong>
+              </div>
+
+              <div>
+                <span>Horas asignadas</span>
+                <strong>{{ seleccionado.horas }}</strong>
+              </div>
+
+              <div>
+                <span>Estado</span>
+                <strong>{{ seleccionado.status }}</strong>
+              </div>
+
+              <div>
+                <span>Fecha de inicio</span>
+                <strong>
+                  {{ seleccionado.fecha_inicio | date:'dd/MM/yyyy' }}
+                </strong>
+              </div>
+
+              <div>
+                <span>Fecha de finalización</span>
+                <strong>
+                  {{ seleccionado.fecha_fin
+                    ? (seleccionado.fecha_fin | date:'dd/MM/yyyy')
+                    : 'Sin fecha definida' }}
+                </strong>
+              </div>
+            </div>
+
+            <div class="acciones">
+              <ion-button (click)="editarContrato()">
+                <ion-icon name="create-outline" slot="start"></ion-icon>
+                Editar
+              </ion-button>
+
+              <ion-button
+                *ngIf="seleccionado.status === 'Activo'"
+                color="danger"
+                fill="outline"
+                (click)="confirmarBaja()">
+                <ion-icon name="trash-outline" slot="start"></ion-icon>
+                Dar de baja
+              </ion-button>
+            </div>
+          </ion-card-content>
+        </ion-card>
+      </ng-container>
+
+    </ng-container>
+
+    <!-- =========================
+         FORMULARIO
+    ========================== -->
+
+    <ng-container *ngIf="vista === 'formulario'">
+
+      <ion-card>
+        <ion-card-header>
+          <ion-card-title>
+            {{ editando ? 'Actualizar contrato' : 'Registrar contrato' }}
+          </ion-card-title>
+          <p>Completa los datos correspondientes.</p>
+        </ion-card-header>
+
+        <ion-card-content>
+
+          <form (ngSubmit)="guardarContrato()">
+
+            <ion-list>
+
+              <ion-item>
+                <ion-select
+                  label="Docente"
+                  labelPlacement="stacked"
+                  placeholder="Seleccionar docente"
+                  name="id_docente"
+                  [(ngModel)]="form.id_docente">
+                  <ion-select-option
+                    *ngFor="let d of docentes"
+                    [value]="d.id_docente">
+                    {{ d.nombre }}
+                    {{ d.seg_nombre || '' }}
+                    {{ d.apellidos || '' }}
+                    {{ d.codigo ? '(' + d.codigo + ')' : '' }}
+                  </ion-select-option>
+                </ion-select>
+              </ion-item>
+
+              <ion-item>
+                <ion-select
+                  label="Área"
+                  labelPlacement="stacked"
+                  placeholder="Seleccionar área"
+                  name="id_area"
+                  [(ngModel)]="form.id_area">
+                  <ion-select-option
+                    *ngFor="let a of areas"
+                    [value]="a.id_area">
+                    {{ a.nombre }}
+                  </ion-select-option>
+                </ion-select>
+              </ion-item>
+
+              <ion-item>
+                <ion-input
+                  label="Folio de contrato"
+                  labelPlacement="stacked"
+                  placeholder="Ej. CONT-2026-001"
+                  name="folio_contrato"
+                  maxlength="30"
+                  [(ngModel)]="form.folio_contrato">
+                </ion-input>
+              </ion-item>
+
+              <ion-item>
+                <ion-input
+                  label="Horas asignadas"
+                  labelPlacement="stacked"
+                  type="number"
+                  min="1"
+                  step="1"
+                  name="horas"
+                  [(ngModel)]="form.horas">
+                </ion-input>
+              </ion-item>
+
+              <ion-item>
+                <ion-select
+                  label="Rol"
+                  labelPlacement="stacked"
+                  name="rol"
+                  [(ngModel)]="form.rol">
+                  <ion-select-option
+                    *ngFor="let rol of roles"
+                    [value]="rol">
+                    {{ rol }}
+                  </ion-select-option>
+                </ion-select>
+              </ion-item>
+
+              <ion-item>
+                <ion-select
+                  label="Estado"
+                  labelPlacement="stacked"
+                  name="status"
+                  [(ngModel)]="form.status">
+                  <ion-select-option
+                    *ngFor="let estado of estados"
+                    [value]="estado">
+                    {{ estado }}
+                  </ion-select-option>
+                </ion-select>
+              </ion-item>
+
+              <ion-item>
+                <ion-input
+                  label="Fecha de inicio"
+                  labelPlacement="stacked"
+                  type="date"
+                  name="fecha_inicio"
+                  [(ngModel)]="form.fecha_inicio">
+                </ion-input>
+              </ion-item>
+
+              <ion-item>
+                <ion-input
+                  label="Fecha de finalización (opcional)"
+                  labelPlacement="stacked"
+                  type="date"
+                  name="fecha_fin"
+                  [(ngModel)]="form.fecha_fin">
+                </ion-input>
+              </ion-item>
+
+            </ion-list>
+
+            <div class="acciones">
+              <ion-button
+                type="submit"
+                [disabled]="guardando">
+                <ion-spinner
+                  *ngIf="guardando"
+                  name="crescent"
+                  slot="start">
+                </ion-spinner>
+
+                <ion-icon
+                  *ngIf="!guardando"
+                  name="save-outline"
+                  slot="start">
+                </ion-icon>
+
+                {{ guardando ? 'Guardando...' :
+                   editando ? 'Guardar cambios' : 'Registrar contrato' }}
+              </ion-button>
+
+              <ion-button
+                type="button"
+                fill="outline"
+                color="medium"
+                [disabled]="guardando"
+                (click)="volver()">
+                Cancelar
+              </ion-button>
+            </div>
+
+          </form>
+
+        </ion-card-content>
+      </ion-card>
+
+    </ng-container>
+
+  </div>
+
 </ion-content>

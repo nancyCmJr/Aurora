@@ -1,13 +1,1013 @@
+
 <ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title>horarios</ion-title>
+
+  <ion-toolbar color="primary">
+
+    <ion-buttons slot="start">
+
+      <ion-back-button
+        *ngIf="vista === 'lista'"
+        defaultHref="/home">
+      </ion-back-button>
+
+      <ion-button
+        *ngIf="vista !== 'lista'"
+        (click)="regresar()"
+        aria-label="Regresar">
+
+        <ion-icon
+          slot="icon-only"
+          name="arrow-back-outline">
+        </ion-icon>
+
+      </ion-button>
+
+    </ion-buttons>
+
+    <ion-title>
+      {{
+        vista === 'lista'
+          ? 'Horarios'
+          : vista === 'detalle'
+          ? 'Detalle del horario'
+          : editando
+          ? 'Editar horario'
+          : 'Nuevo horario'
+      }}
+    </ion-title>
+
+    <ion-buttons
+      *ngIf="vista === 'lista' && esAdmin"
+      slot="end">
+
+      <ion-button
+        (click)="nuevo()"
+        aria-label="Registrar horario">
+
+        <ion-icon
+          slot="icon-only"
+          name="add-outline">
+        </ion-icon>
+
+      </ion-button>
+
+    </ion-buttons>
+
   </ion-toolbar>
+
 </ion-header>
 
+
 <ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">horarios</ion-title>
-    </ion-toolbar>
-  </ion-header>
+
+  <!-- ================================= -->
+  <!-- LISTADO -->
+  <!-- ================================= -->
+
+  <ng-container *ngIf="vista === 'lista'">
+
+    <ion-refresher
+      slot="fixed"
+      (ionRefresh)="refrescar($event)">
+
+      <ion-refresher-content>
+      </ion-refresher-content>
+
+    </ion-refresher>
+
+    <div class="ion-padding">
+
+      <h2>Horarios escolares</h2>
+
+      <p>
+        Consulta las clases, sus salones,
+        grupos, horarios y estados.
+      </p>
+
+      <!-- BUSCADOR -->
+
+      <ion-searchbar
+        name="busqueda"
+        [(ngModel)]="busqueda"
+        [debounce]="200"
+        placeholder="Buscar grupo, salón o materia">
+      </ion-searchbar>
+
+      <!-- FILTRO POR DÍA -->
+
+      <ion-item>
+
+        <ion-select
+          name="filtroDia"
+          label="Día de la semana"
+          labelPlacement="stacked"
+          interface="action-sheet"
+          [(ngModel)]="filtroDia">
+
+          <ion-select-option value="Todos">
+            Todos los días
+          </ion-select-option>
+
+          <ion-select-option
+            *ngFor="let dia of dias"
+            [value]="dia">
+
+            {{ nombreDia(dia) }}
+
+          </ion-select-option>
+
+        </ion-select>
+
+      </ion-item>
+
+      <!-- FILTRO POR ESTADO -->
+
+      <ion-item>
+
+        <ion-select
+          name="filtroEstado"
+          label="Estado del horario"
+          labelPlacement="stacked"
+          interface="action-sheet"
+          [(ngModel)]="filtroEstado">
+
+          <ion-select-option value="Todos">
+            Todos
+          </ion-select-option>
+
+          <ion-select-option value="Activo">
+            Activos
+          </ion-select-option>
+
+          <ion-select-option value="Cancelado">
+            Cancelados
+          </ion-select-option>
+
+        </ion-select>
+
+      </ion-item>
+
+      <ion-note
+        *ngIf="!cargando && !errorLista">
+
+        {{ horariosFiltrados.length }}
+        horario(s) encontrado(s)
+
+      </ion-note>
+
+    </div>
+
+    <!-- CARGANDO -->
+
+    <div
+      *ngIf="cargando || cargandoDetalle"
+      class="ion-padding ion-text-center">
+
+      <ion-spinner name="crescent">
+      </ion-spinner>
+
+      <p>
+        {{
+          cargandoDetalle
+            ? 'Consultando horario...'
+            : 'Cargando horarios...'
+        }}
+      </p>
+
+    </div>
+
+    <!-- ERROR DEL LISTADO -->
+
+    <ion-text
+      *ngIf="errorLista"
+      color="danger">
+
+      <p
+        role="alert"
+        class="ion-padding">
+
+        {{ errorLista }}
+
+      </p>
+
+    </ion-text>
+
+    <ion-button
+      *ngIf="errorLista && !cargando"
+      expand="block"
+      fill="outline"
+      (click)="cargarHorarios()">
+
+      Reintentar
+
+    </ion-button>
+
+    <!-- ERROR DE CONSULTA -->
+
+    <ion-text
+      *ngIf="errorDetalle"
+      color="danger">
+
+      <p
+        role="alert"
+        class="ion-padding">
+
+        {{ errorDetalle }}
+
+      </p>
+
+    </ion-text>
+
+    <!-- RESULTADOS -->
+
+    <ion-list
+      [inset]="true"
+      *ngIf="!cargando && !errorLista">
+
+      <ion-item
+        *ngFor="let horario of horariosFiltrados"
+        button
+        detail="true"
+        [disabled]="cargandoDetalle"
+        (click)="abrirDetalle(horario)">
+
+        <ion-icon
+          slot="start"
+          name="calendar-outline"
+          color="primary">
+        </ion-icon>
+
+        <ion-label>
+
+          <h2>
+            {{ nombreGrupo(horario) }}
+          </h2>
+
+          <p>
+            {{ nombreMateria(horario) }}
+          </p>
+
+          <p>
+            {{ nombreDia(horario.dia_semana) }}
+          </p>
+
+          <p>
+            {{ horario.hora_inicio }}
+            -
+            {{ horario.hora_fin }}
+          </p>
+
+          <p>
+            Salón:
+            {{ nombreSalon(horario) }}
+          </p>
+
+          <p>
+            Docente:
+            {{ nombreDocente(horario) }}
+          </p>
+
+          <!-- ESTADO REAL -->
+
+          <ion-badge
+            [color]="colorEstado(horario.estado)">
+
+            {{ horario.estado || 'Sin estado' }}
+
+          </ion-badge>
+
+        </ion-label>
+
+      </ion-item>
+
+    </ion-list>
+
+    <!-- SIN RESULTADOS -->
+
+    <div
+      class="ion-padding ion-text-center"
+      *ngIf="
+        !cargando &&
+        !errorLista &&
+        horariosFiltrados.length === 0
+      ">
+
+      <p>
+        No se encontraron horarios.
+      </p>
+
+      <ion-button
+        *ngIf="esAdmin"
+        fill="outline"
+        (click)="nuevo()">
+
+        Registrar horario
+
+      </ion-button>
+
+    </div>
+
+  </ng-container>
+
+
+  <!-- ================================= -->
+  <!-- DETALLE -->
+  <!-- ================================= -->
+
+  <ng-container
+    *ngIf="
+      vista === 'detalle' &&
+      seleccionado as horario
+    ">
+
+    <div class="ion-padding">
+
+      <h2>Detalle del horario</h2>
+
+      <!-- ESTADO -->
+
+      <ion-badge
+        [color]="colorEstado(horario.estado)">
+
+        {{ horario.estado || 'Sin estado' }}
+
+      </ion-badge>
+
+      <!-- INFORMACIÓN ACADÉMICA -->
+
+      <h3>Asignación académica</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+
+          <ion-label>
+            <h3>Identificador</h3>
+            <p>{{ horario.id_horario }}</p>
+          </ion-label>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-icon
+            slot="start"
+            name="school-outline"
+            color="primary">
+          </ion-icon>
+
+          <ion-label>
+
+            <h3>Grupo</h3>
+
+            <p>
+              {{ nombreGrupo(horario) }}
+            </p>
+
+          </ion-label>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-label>
+
+            <h3>Materia</h3>
+
+            <p>
+              {{ nombreMateria(horario) }}
+            </p>
+
+          </ion-label>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-label>
+
+            <h3>Docente</h3>
+
+            <p>
+              {{ nombreDocente(horario) }}
+            </p>
+
+          </ion-label>
+
+        </ion-item>
+
+      </ion-list>
+
+      <!-- UBICACIÓN -->
+
+      <h3>Espacio asignado</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+
+          <ion-icon
+            slot="start"
+            name="location-outline"
+            color="primary">
+          </ion-icon>
+
+          <ion-label>
+
+            <h3>Salón</h3>
+
+            <p>
+              {{ nombreSalon(horario) }}
+            </p>
+
+          </ion-label>
+
+        </ion-item>
+
+        <ion-item
+          *ngIf="horario.nombre_edificio">
+
+          <ion-label>
+
+            <h3>Edificio</h3>
+
+            <p>
+              {{ horario.nombre_edificio }}
+            </p>
+
+          </ion-label>
+
+        </ion-item>
+
+      </ion-list>
+
+      <!-- DÍA Y HORAS -->
+
+      <h3>Día y horas</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+
+          <ion-icon
+            slot="start"
+            name="calendar-outline"
+            color="primary">
+          </ion-icon>
+
+          <ion-label>
+
+            <h3>Día de la semana</h3>
+
+            <p>
+              {{ nombreDia(horario.dia_semana) }}
+            </p>
+
+          </ion-label>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-icon
+            slot="start"
+            name="time-outline"
+            color="primary">
+          </ion-icon>
+
+          <ion-label>
+
+            <h3>Hora de inicio</h3>
+
+            <p>
+              {{ horario.hora_inicio }}
+            </p>
+
+          </ion-label>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-label>
+
+            <h3>Hora de fin</h3>
+
+            <p>
+              {{ horario.hora_fin }}
+            </p>
+
+          </ion-label>
+
+        </ion-item>
+
+        <!-- ESTADO -->
+
+        <ion-item>
+
+          <ion-label>
+
+            <h3>Estado del horario</h3>
+
+            <p>
+              {{ horario.estado || 'Sin estado' }}
+            </p>
+
+          </ion-label>
+
+          <ion-badge
+            slot="end"
+            [color]="colorEstado(horario.estado)">
+
+            {{ horario.estado || 'Sin estado' }}
+
+          </ion-badge>
+
+        </ion-item>
+
+      </ion-list>
+
+      <!-- PERIODO DEL GRUPO -->
+
+      <ion-list
+        [inset]="true"
+        *ngIf="
+          horario.periodo ||
+          horario.anio
+        ">
+
+        <ion-item>
+
+          <ion-label>
+
+            <h3>Periodo escolar</h3>
+
+            <p>
+              {{ horario.periodo || '' }}
+              {{ horario.anio || '' }}
+            </p>
+
+          </ion-label>
+
+        </ion-item>
+
+      </ion-list>
+
+      <!-- INFORMACIÓN DE CANCELACIÓN -->
+
+      <ion-note
+        *ngIf="horario.estado === 'Cancelado'">
+
+        Este horario fue cancelado.
+        Su registro se conserva para
+        consulta histórica.
+
+      </ion-note>
+
+      <!-- ACCIONES -->
+
+      <ng-container
+        *ngIf="
+          esAdmin &&
+          horario.estado === 'Activo'
+        ">
+
+        <ion-button
+          expand="block"
+          [disabled]="cancelando"
+          (click)="editar()">
+
+          <ion-icon
+            slot="start"
+            name="create-outline">
+          </ion-icon>
+
+          Editar horario
+
+        </ion-button>
+
+        <ion-button
+          expand="block"
+          fill="outline"
+          color="danger"
+          [disabled]="cancelando"
+          (click)="confirmarCancelar()">
+
+          <ion-icon
+            slot="start"
+            name="ban-outline">
+          </ion-icon>
+
+          Cancelar horario
+
+        </ion-button>
+
+      </ng-container>
+
+    </div>
+
+  </ng-container>
+
+
+  <!-- ================================= -->
+  <!-- FORMULARIO -->
+  <!-- ================================= -->
+
+  <ng-container
+    *ngIf="
+      vista === 'formulario' &&
+      esAdmin
+    ">
+
+    <div class="ion-padding">
+
+      <h2>
+        {{
+          editando
+            ? 'Modificar horario'
+            : 'Registrar horario'
+        }}
+      </h2>
+
+      <p>
+        Completa los campos para asignar
+        un grupo a un salón y horario.
+      </p>
+
+      <!-- GRUPO -->
+
+      <h3>Asignación académica</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+
+          <ion-select
+            name="id_grupo"
+            label="Grupo *"
+            labelPlacement="stacked"
+            interface="alert"
+            [(ngModel)]="formulario.id_grupo"
+            (ionChange)="alCambiarGrupo()"
+            [disabled]="cargandoCatalogos">
+
+            <ion-select-option
+              *ngFor="let grupo of gruposDisponibles"
+              [value]="grupo.id_grupo">
+
+              {{ grupo.clave_grupo }}
+              -
+              Semestre {{ grupo.semestre }}
+              -
+              {{ grupo.periodo || 'Sin periodo' }}
+              {{ grupo.anio || '' }}
+
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+        <!-- DATOS DEL GRUPO -->
+
+        <ng-container
+          *ngIf="grupoSeleccionado as grupo">
+
+          <ion-item>
+
+            <ion-label>
+
+              <h3>Materia</h3>
+
+              <p>
+                {{
+                  grupo.nombre_materia ||
+                  'Materia no especificada'
+                }}
+              </p>
+
+            </ion-label>
+
+          </ion-item>
+
+          <ion-item>
+
+            <ion-label>
+
+              <h3>Modalidad</h3>
+
+              <p>
+                {{
+                  grupo.modalidad === 'Sabado'
+                    ? 'Sábado'
+                    : 'Entre semana'
+                }}
+              </p>
+
+            </ion-label>
+
+          </ion-item>
+
+          <ion-item>
+
+            <ion-label>
+
+              <h3>Estado del grupo</h3>
+
+              <p>
+                {{ grupo.estado }}
+              </p>
+
+            </ion-label>
+
+          </ion-item>
+
+          <ion-item>
+
+            <ion-label>
+
+              <h3>Capacidad del grupo</h3>
+
+              <p>
+                {{ grupo.capacidad }}
+                alumnos
+              </p>
+
+            </ion-label>
+
+          </ion-item>
+
+        </ng-container>
+
+      </ion-list>
+
+      <!-- SALÓN -->
+
+      <h3>Espacio asignado</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+
+          <ion-select
+            name="id_salon"
+            label="Salón *"
+            labelPlacement="stacked"
+            interface="alert"
+            [(ngModel)]="formulario.id_salon"
+            [disabled]="cargandoCatalogos">
+
+            <ion-select-option
+              *ngFor="let salon of salonesDisponibles"
+              [value]="salon.id_salon">
+
+              {{ salon.nombre }}
+              -
+              Capacidad {{ salon.capacidad }}
+              {{ salon.nombre_edificio || '' }}
+
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+        <ng-container
+          *ngIf="salonSeleccionado as salon">
+
+          <ion-item>
+
+            <ion-label>
+
+              <h3>Salón seleccionado</h3>
+
+              <p>
+                {{ salon.nombre }}
+              </p>
+
+              <p>
+                Capacidad:
+                {{ salon.capacidad }}
+              </p>
+
+              <p *ngIf="salon.tipo">
+                Tipo:
+                {{ salon.tipo }}
+              </p>
+
+              <p *ngIf="salon.nombre_edificio">
+                Edificio:
+                {{ salon.nombre_edificio }}
+              </p>
+
+            </ion-label>
+
+          </ion-item>
+
+          <ion-note
+            color="danger"
+            *ngIf="
+              grupoSeleccionado &&
+              grupoSeleccionado.capacidad >
+                salon.capacidad
+            ">
+
+            La capacidad del salón es
+            menor que la del grupo.
+
+          </ion-note>
+
+        </ng-container>
+
+      </ion-list>
+
+      <!-- DÍA Y HORAS -->
+
+      <h3>Día y horas</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+
+          <ion-select
+            name="dia_semana"
+            label="Día de la semana *"
+            labelPlacement="stacked"
+            interface="action-sheet"
+            [(ngModel)]="formulario.dia_semana">
+
+            <ion-select-option
+              *ngFor="let dia of diasDisponibles"
+              [value]="dia">
+
+              {{ nombreDia(dia) }}
+
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-input
+            name="hora_inicio"
+            label="Hora de inicio *"
+            labelPlacement="stacked"
+            type="time"
+            [(ngModel)]="formulario.hora_inicio">
+          </ion-input>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-input
+            name="hora_fin"
+            label="Hora de fin *"
+            labelPlacement="stacked"
+            type="time"
+            [(ngModel)]="formulario.hora_fin">
+          </ion-input>
+
+        </ion-item>
+
+      </ion-list>
+
+      <!-- ESTADO DEL HORARIO -->
+
+      <h3>Estado del horario</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+
+          <ion-select
+            name="estado"
+            label="Estado *"
+            labelPlacement="stacked"
+            interface="action-sheet"
+            [(ngModel)]="formulario.estado"
+            [disabled]="!editando">
+
+            <ion-select-option value="Activo">
+              Activo
+            </ion-select-option>
+
+            <ion-select-option
+              *ngIf="editando"
+              value="Cancelado">
+
+              Cancelado
+
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+      </ion-list>
+
+      <ion-note>
+        Los horarios nuevos se registran
+        como Activo. Para cancelarlos puedes
+        editar su estado o utilizar la opción
+        «Cancelar horario» en el detalle.
+      </ion-note>
+
+      <!-- CARGANDO -->
+
+      <div
+        *ngIf="cargandoCatalogos"
+        class="ion-padding ion-text-center">
+
+        <ion-spinner name="crescent">
+        </ion-spinner>
+
+        <p>
+          Cargando grupos y salones...
+        </p>
+
+      </div>
+
+      <!-- ERRORES DE CATÁLOGOS -->
+
+      <ion-text
+        *ngIf="errorCatalogos"
+        color="danger">
+
+        <p role="alert">
+          {{ errorCatalogos }}
+        </p>
+
+      </ion-text>
+
+      <ion-button
+        *ngIf="errorCatalogos"
+        fill="clear"
+        (click)="cargarCatalogos()">
+
+        Reintentar cargar catálogos
+
+      </ion-button>
+
+      <!-- ERROR DEL FORMULARIO -->
+
+      <ion-text
+        *ngIf="errorFormulario"
+        color="danger">
+
+        <p role="alert">
+          {{ errorFormulario }}
+        </p>
+
+      </ion-text>
+
+      <!-- GUARDAR -->
+
+      <ion-button
+        expand="block"
+        (click)="guardar()"
+        [disabled]="
+          guardando ||
+          cargandoCatalogos ||
+          !catalogosListos
+        ">
+
+        <ion-spinner
+          *ngIf="guardando"
+          slot="start"
+          name="crescent">
+        </ion-spinner>
+
+        <ion-icon
+          *ngIf="!guardando"
+          slot="start"
+          name="save-outline">
+        </ion-icon>
+
+        {{
+          guardando
+            ? 'Guardando...'
+            : editando
+            ? 'Guardar cambios'
+            : 'Registrar horario'
+        }}
+
+      </ion-button>
+
+      <ion-button
+        expand="block"
+        fill="clear"
+        [disabled]="guardando"
+        (click)="regresar()">
+
+        Volver
+
+      </ion-button>
+
+    </div>
+
+  </ng-container>
+
 </ion-content>
