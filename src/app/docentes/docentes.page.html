@@ -1,13 +1,919 @@
+
 <ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title>docentes</ion-title>
+
+  <ion-toolbar color="primary">
+
+    <ion-buttons slot="start">
+
+      <ion-back-button
+        *ngIf="vista === 'lista'"
+        defaultHref="/home">
+      </ion-back-button>
+
+      <ion-button
+        *ngIf="vista !== 'lista'"
+        (click)="regresar()"
+        aria-label="Regresar">
+
+        <ion-icon
+          name="arrow-back-outline"
+          slot="icon-only">
+        </ion-icon>
+
+      </ion-button>
+
+    </ion-buttons>
+
+    <ion-title>
+      {{
+        vista === 'lista'
+          ? 'Docentes'
+          : vista === 'detalle'
+          ? 'Expediente docente'
+          : editando
+          ? 'Editar docente'
+          : 'Nuevo docente'
+      }}
+    </ion-title>
+
+    <ion-buttons
+      slot="end"
+      *ngIf="vista === 'lista'">
+
+      <ion-button
+        (click)="nuevo()"
+        aria-label="Registrar docente">
+
+        <ion-icon
+          name="add-outline"
+          slot="icon-only">
+        </ion-icon>
+
+      </ion-button>
+
+    </ion-buttons>
+
   </ion-toolbar>
+
 </ion-header>
 
+
 <ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">docentes</ion-title>
-    </ion-toolbar>
-  </ion-header>
+
+  <!-- ================================= -->
+  <!-- LISTADO DE DOCENTES -->
+  <!-- ================================= -->
+
+  <ng-container *ngIf="vista === 'lista'">
+
+    <ion-refresher
+      slot="fixed"
+      (ionRefresh)="refrescar($event)">
+
+      <ion-refresher-content>
+      </ion-refresher-content>
+
+    </ion-refresher>
+
+
+    <div class="ion-padding">
+
+      <h2>Personal docente</h2>
+
+      <p>
+        Consulta los expedientes y registra nuevos docentes.
+      </p>
+
+      <!-- BUSCADOR -->
+
+      <ion-searchbar
+        name="busqueda"
+        placeholder="Buscar por nombre, código o cédula"
+        [debounce]="200"
+        [(ngModel)]="busqueda">
+      </ion-searchbar>
+
+      <!-- FILTRO -->
+
+      <ion-item>
+
+        <ion-select
+          label="Filtrar por estado"
+          labelPlacement="stacked"
+          interface="action-sheet"
+          name="filtro"
+          [(ngModel)]="filtro">
+
+          <ion-select-option value="Todos">
+            Todos
+          </ion-select-option>
+
+          <ion-select-option value="Activo">
+            Activos
+          </ion-select-option>
+
+          <ion-select-option value="Inactivo">
+            Inactivos
+          </ion-select-option>
+
+          <ion-select-option value="Baja">
+            Bajas
+          </ion-select-option>
+
+        </ion-select>
+
+      </ion-item>
+
+      <ion-note
+        *ngIf="!cargando && !errorLista">
+
+        {{ docentesFiltrados.length }}
+        docente(s) encontrados
+
+      </ion-note>
+
+    </div>
+
+
+    <!-- CARGANDO -->
+
+    <div
+      class="ion-padding ion-text-center"
+      *ngIf="cargando || cargandoDetalle">
+
+      <ion-spinner name="crescent">
+      </ion-spinner>
+
+      <p>
+        {{
+          cargandoDetalle
+            ? 'Abriendo expediente...'
+            : 'Cargando docentes...'
+        }}
+      </p>
+
+    </div>
+
+
+    <!-- ERROR DE CONEXIÓN -->
+
+    <ion-text
+      color="danger"
+      *ngIf="errorLista">
+
+      <p class="ion-padding" role="alert">
+        {{ errorLista }}
+      </p>
+
+    </ion-text>
+
+    <ion-button
+      *ngIf="errorLista && !cargando"
+      fill="outline"
+      expand="block"
+      (click)="cargarDocentes()">
+
+      Reintentar
+
+    </ion-button>
+
+
+    <!-- LISTA DE DOCENTES -->
+
+    <ion-list
+      [inset]="true"
+      *ngIf="!cargando && !errorLista">
+
+      <ion-item
+        *ngFor="let docente of docentesFiltrados"
+        button
+        detail="true"
+        [disabled]="cargandoDetalle"
+        (click)="abrirDetalle(docente)">
+
+        <ion-icon
+          name="person-outline"
+          color="primary"
+          slot="start">
+        </ion-icon>
+
+        <ion-label>
+
+          <h2>
+            {{ nombreCompleto(docente) }}
+          </h2>
+
+          <p>
+            Código: {{ docente.codigo }}
+          </p>
+
+          <p>
+            {{
+              docente.titulo_academico ||
+              'Sin título registrado'
+            }}
+          </p>
+
+          <ion-badge
+            [color]="
+              docente.estado === 'Activo'
+                ? 'success'
+                : docente.estado === 'Inactivo'
+                ? 'warning'
+                : 'medium'
+            ">
+
+            {{ docente.estado }}
+
+          </ion-badge>
+
+        </ion-label>
+
+      </ion-item>
+
+    </ion-list>
+
+
+    <!-- SIN RESULTADOS -->
+
+    <div
+      class="ion-padding ion-text-center"
+      *ngIf="
+        !cargando &&
+        !errorLista &&
+        docentesFiltrados.length === 0
+      ">
+
+      <p>
+        No hay docentes que coincidan con la búsqueda.
+      </p>
+
+      <ion-button
+        fill="outline"
+        (click)="nuevo()">
+
+        Registrar docente
+
+      </ion-button>
+
+    </div>
+
+  </ng-container>
+
+
+  <!-- ================================= -->
+  <!-- EXPEDIENTE DOCENTE -->
+  <!-- ================================= -->
+
+  <ng-container
+    *ngIf="vista === 'detalle' && seleccionado as d">
+
+    <div class="ion-padding">
+
+      <h2>
+        {{ nombreCompleto(d) }}
+      </h2>
+
+      <ion-badge
+        [color]="
+          d.estado === 'Activo'
+            ? 'success'
+            : d.estado === 'Inactivo'
+            ? 'warning'
+            : 'medium'
+        ">
+
+        {{ d.estado }}
+
+      </ion-badge>
+
+
+      <!-- DATOS LABORALES -->
+
+      <h3>Datos laborales</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+          <ion-label>
+            <h3>ID del docente</h3>
+            <p>{{ d.id_docente }}</p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Código de empleado</h3>
+            <p>{{ d.codigo }}</p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Cédula profesional</h3>
+            <p>{{ mostrar(d.cedula) }}</p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Título académico</h3>
+            <p>{{ mostrar(d.titulo_academico) }}</p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Fecha de ingreso</h3>
+            <p>
+              {{
+                mostrar(
+                  detalleSeleccionado.fecha_ingreso
+                )
+              }}
+            </p>
+          </ion-label>
+        </ion-item>
+
+      </ion-list>
+
+
+      <!-- INFORMACIÓN PERSONAL -->
+
+      <h3>Información personal</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+          <ion-label>
+            <h3>CURP</h3>
+            <p>
+              {{ mostrar(detalleSeleccionado.curp) }}
+            </p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>RFC</h3>
+            <p>
+              {{ mostrar(detalleSeleccionado.rfc) }}
+            </p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Fecha de nacimiento</h3>
+            <p>
+              {{
+                mostrar(
+                  detalleSeleccionado.fecha_nacimiento
+                )
+              }}
+            </p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Teléfono</h3>
+            <p>
+              {{ mostrar(detalleSeleccionado.telefono) }}
+            </p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Correo</h3>
+            <p>
+              {{ mostrar(detalleSeleccionado.email) }}
+            </p>
+          </ion-label>
+        </ion-item>
+
+      </ion-list>
+
+
+      <!-- DOMICILIO -->
+
+      <h3>Domicilio</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+          <ion-label>
+            <h3>Calle</h3>
+            <p>
+              {{ mostrar(detalleSeleccionado.calle) }}
+            </p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Número exterior</h3>
+            <p>
+              {{
+                mostrar(
+                  detalleSeleccionado.numero_exterior
+                )
+              }}
+            </p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Número interior</h3>
+            <p>
+              {{
+                mostrar(
+                  detalleSeleccionado.numero_interior
+                )
+              }}
+            </p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Colonia</h3>
+            <p>
+              {{ mostrar(detalleSeleccionado.colonia) }}
+            </p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Código postal</h3>
+            <p>
+              {{
+                mostrar(
+                  detalleSeleccionado.codigo_postal
+                )
+              }}
+            </p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Municipio</h3>
+            <p>
+              {{
+                mostrar(
+                  detalleSeleccionado.municipio
+                )
+              }}
+            </p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Estado del domicilio</h3>
+            <p>
+              {{
+                mostrar(
+                  detalleSeleccionado.estado
+                )
+              }}
+            </p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Referencias</h3>
+            <p>
+              {{
+                mostrar(
+                  detalleSeleccionado.referencias
+                )
+              }}
+            </p>
+          </ion-label>
+        </ion-item>
+
+      </ion-list>
+
+
+      <!-- ACCIONES -->
+
+      <ion-button
+        expand="block"
+        (click)="editar()">
+
+        <ion-icon
+          name="create-outline"
+          slot="start">
+        </ion-icon>
+
+        Editar docente
+
+      </ion-button>
+
+      <ion-button
+        expand="block"
+        fill="outline"
+        color="danger"
+        *ngIf="d.estado !== 'Baja'"
+        [disabled]="dandoDeBaja"
+        (click)="confirmarBaja()">
+
+        <ion-icon
+          name="trash-outline"
+          slot="start">
+        </ion-icon>
+
+        Dar de baja
+
+      </ion-button>
+
+    </div>
+
+  </ng-container>
+
+
+  <!-- ================================= -->
+  <!-- FORMULARIO -->
+  <!-- ================================= -->
+
+  <ng-container *ngIf="vista === 'formulario'">
+
+    <div class="ion-padding">
+
+      <p>
+        {{
+          editando
+            ? 'Modifica la información del docente.'
+            : 'Captura los datos del nuevo docente.'
+        }}
+      </p>
+
+
+      <!-- DATOS LABORALES -->
+
+      <h3>Datos laborales</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+
+          <ion-input
+            label="Código de empleado *"
+            labelPlacement="stacked"
+            name="codigo"
+            [maxlength]="20"
+            [(ngModel)]="formulario.codigo"
+            placeholder="Ej. DOC001">
+          </ion-input>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-input
+            label="Primer nombre *"
+            labelPlacement="stacked"
+            name="nombre"
+            [maxlength]="60"
+            [(ngModel)]="formulario.nombre">
+          </ion-input>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-input
+            label="Segundo nombre"
+            labelPlacement="stacked"
+            name="seg_nombre"
+            [maxlength]="60"
+            [(ngModel)]="formulario.seg_nombre">
+          </ion-input>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-input
+            label="Apellidos *"
+            labelPlacement="stacked"
+            name="apellidos"
+            [maxlength]="100"
+            [(ngModel)]="formulario.apellidos">
+          </ion-input>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-input
+            label="Cédula profesional"
+            labelPlacement="stacked"
+            name="cedula"
+            [maxlength]="20"
+            inputmode="numeric"
+            [(ngModel)]="formulario.cedula">
+          </ion-input>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-input
+            label="Título académico"
+            labelPlacement="stacked"
+            name="titulo_academico"
+            [maxlength]="100"
+            [(ngModel)]="formulario.titulo_academico"
+            placeholder="Ej. Ingeniería en Sistemas">
+          </ion-input>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-select
+            label="Estado laboral"
+            labelPlacement="stacked"
+            interface="action-sheet"
+            name="estado"
+            [(ngModel)]="formulario.estado">
+
+            <ion-select-option value="Activo">
+              Activo
+            </ion-select-option>
+
+            <ion-select-option value="Inactivo">
+              Inactivo
+            </ion-select-option>
+
+            <ion-select-option value="Baja">
+              Baja
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-input
+            label="Fecha de ingreso"
+            labelPlacement="stacked"
+            name="fecha_ingreso"
+            type="date"
+            [(ngModel)]="formulario.detalle.fecha_ingreso">
+          </ion-input>
+
+        </ion-item>
+
+      </ion-list>
+
+
+      <!-- INFORMACIÓN PERSONAL -->
+
+      <h3>Información personal</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+
+          <ion-input
+            label="CURP"
+            labelPlacement="stacked"
+            name="curp"
+            [maxlength]="18"
+            autocapitalize="characters"
+            [(ngModel)]="formulario.detalle.curp">
+          </ion-input>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-input
+            label="RFC"
+            labelPlacement="stacked"
+            name="rfc"
+            [maxlength]="13"
+            autocapitalize="characters"
+            [(ngModel)]="formulario.detalle.rfc">
+          </ion-input>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-input
+            label="Fecha de nacimiento"
+            labelPlacement="stacked"
+            name="fecha_nacimiento"
+            type="date"
+            [(ngModel)]="formulario.detalle.fecha_nacimiento">
+          </ion-input>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-input
+            label="Teléfono"
+            labelPlacement="stacked"
+            name="telefono"
+            type="tel"
+            inputmode="tel"
+            [maxlength]="15"
+            [(ngModel)]="formulario.detalle.telefono">
+          </ion-input>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-input
+            label="Correo electrónico"
+            labelPlacement="stacked"
+            name="email"
+            type="email"
+            inputmode="email"
+            [(ngModel)]="formulario.detalle.email">
+          </ion-input>
+
+        </ion-item>
+
+      </ion-list>
+
+
+      <!-- DOMICILIO -->
+
+      <h3>Domicilio</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+
+          <ion-input
+            label="Calle"
+            labelPlacement="stacked"
+            name="calle"
+            [maxlength]="100"
+            [(ngModel)]="formulario.detalle.calle">
+          </ion-input>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-input
+            label="Número exterior"
+            labelPlacement="stacked"
+            name="numero_exterior"
+            [maxlength]="10"
+            [(ngModel)]="formulario.detalle.numero_exterior">
+          </ion-input>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-input
+            label="Número interior"
+            labelPlacement="stacked"
+            name="numero_interior"
+            [maxlength]="10"
+            [(ngModel)]="formulario.detalle.numero_interior">
+          </ion-input>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-input
+            label="Colonia"
+            labelPlacement="stacked"
+            name="colonia"
+            [maxlength]="80"
+            [(ngModel)]="formulario.detalle.colonia">
+          </ion-input>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-input
+            label="Código postal"
+            labelPlacement="stacked"
+            name="codigo_postal"
+            inputmode="numeric"
+            [maxlength]="5"
+            [(ngModel)]="formulario.detalle.codigo_postal">
+          </ion-input>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-input
+            label="Municipio"
+            labelPlacement="stacked"
+            name="municipio"
+            [maxlength]="80"
+            [(ngModel)]="formulario.detalle.municipio">
+          </ion-input>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-input
+            label="Estado (domicilio)"
+            labelPlacement="stacked"
+            name="estado_domicilio"
+            [maxlength]="50"
+            [(ngModel)]="formulario.detalle.estado">
+          </ion-input>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-input
+            label="Referencias"
+            labelPlacement="stacked"
+            name="referencias"
+            [maxlength]="150"
+            [(ngModel)]="formulario.detalle.referencias">
+          </ion-input>
+
+        </ion-item>
+
+      </ion-list>
+
+
+      <!-- VALIDACIÓN -->
+
+      <ion-note>
+        Los campos con * son obligatorios.
+      </ion-note>
+
+      <ion-text
+        color="danger"
+        *ngIf="errorFormulario">
+
+        <p role="alert">
+          {{ errorFormulario }}
+        </p>
+
+      </ion-text>
+
+
+      <!-- GUARDAR -->
+
+      <ion-button
+        expand="block"
+        (click)="guardar()"
+        [disabled]="guardando">
+
+        <ion-spinner
+          *ngIf="guardando"
+          name="crescent"
+          slot="start">
+        </ion-spinner>
+
+        <ion-icon
+          *ngIf="!guardando"
+          name="save-outline"
+          slot="start">
+        </ion-icon>
+
+        {{
+          guardando
+            ? 'Guardando...'
+            : editando
+            ? 'Guardar cambios'
+            : 'Registrar docente'
+        }}
+
+      </ion-button>
+
+      <ion-button
+        expand="block"
+        fill="clear"
+        (click)="regresar()"
+        [disabled]="guardando">
+
+        Cancelar
+
+      </ion-button>
+
+    </div>
+
+  </ng-container>
+
 </ion-content>

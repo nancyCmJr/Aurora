@@ -1,13 +1,592 @@
+
 <ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title>carreras</ion-title>
+
+  <ion-toolbar color="primary">
+
+    <ion-buttons slot="start">
+
+      <ion-back-button
+        *ngIf="vista === 'lista'"
+        defaultHref="/home">
+      </ion-back-button>
+
+      <ion-button
+        *ngIf="vista !== 'lista'"
+        (click)="regresar()"
+        aria-label="Regresar">
+
+        <ion-icon
+          slot="icon-only"
+          name="arrow-back-outline">
+        </ion-icon>
+
+      </ion-button>
+
+    </ion-buttons>
+
+    <ion-title>
+      {{
+        vista === 'lista'
+          ? 'Carreras'
+          : vista === 'detalle'
+          ? 'Detalle de carrera'
+          : editando
+          ? 'Editar carrera'
+          : 'Nueva carrera'
+      }}
+    </ion-title>
+
+    <ion-buttons
+      slot="end"
+      *ngIf="vista === 'lista'">
+
+      <ion-button
+        (click)="nueva()"
+        aria-label="Registrar carrera">
+
+        <ion-icon
+          slot="icon-only"
+          name="add-outline">
+        </ion-icon>
+
+      </ion-button>
+
+    </ion-buttons>
+
   </ion-toolbar>
+
 </ion-header>
 
+
 <ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">carreras</ion-title>
-    </ion-toolbar>
-  </ion-header>
+
+  <!-- ================================= -->
+  <!-- LISTADO DE CARRERAS -->
+  <!-- ================================= -->
+
+  <ng-container *ngIf="vista === 'lista'">
+
+    <ion-refresher
+      slot="fixed"
+      (ionRefresh)="refrescar($event)">
+
+      <ion-refresher-content>
+      </ion-refresher-content>
+
+    </ion-refresher>
+
+    <div class="ion-padding">
+
+      <h2>Carreras registradas</h2>
+
+      <p>
+        Consulta y administra los programas académicos.
+      </p>
+
+      <!-- BUSCADOR -->
+
+      <ion-searchbar
+        name="busqueda"
+        [(ngModel)]="busqueda"
+        placeholder="Buscar carrera o tipo"
+        [debounce]="200">
+      </ion-searchbar>
+
+      <!-- FILTRO -->
+
+      <ion-item>
+
+        <ion-select
+          name="filtro"
+          label="Filtrar por estado"
+          labelPlacement="stacked"
+          interface="action-sheet"
+          [(ngModel)]="filtro">
+
+          <ion-select-option value="Todas">
+            Todas
+          </ion-select-option>
+
+          <ion-select-option value="Activa">
+            Activas
+          </ion-select-option>
+
+          <ion-select-option value="Inactiva">
+            Inactivas
+          </ion-select-option>
+
+        </ion-select>
+
+      </ion-item>
+
+      <ion-note
+        *ngIf="!cargando && !errorLista">
+
+        {{ carrerasFiltradas.length }}
+        carrera(s) encontrada(s)
+
+      </ion-note>
+
+    </div>
+
+
+    <!-- CARGANDO -->
+
+    <div
+      class="ion-text-center ion-padding"
+      *ngIf="cargando || cargandoDetalle">
+
+      <ion-spinner name="crescent">
+      </ion-spinner>
+
+      <p>
+        {{
+          cargandoDetalle
+            ? 'Consultando carrera...'
+            : 'Cargando carreras...'
+        }}
+      </p>
+
+    </div>
+
+
+    <!-- ERROR AL LISTAR -->
+
+    <ion-text
+      color="danger"
+      *ngIf="errorLista">
+
+      <p class="ion-padding" role="alert">
+        {{ errorLista }}
+      </p>
+
+    </ion-text>
+
+    <ion-button
+      *ngIf="errorLista && !cargando"
+      expand="block"
+      fill="outline"
+      (click)="cargarCarreras()">
+
+      Reintentar
+
+    </ion-button>
+
+
+    <!-- ERROR AL CONSULTAR -->
+
+    <ion-text
+      color="danger"
+      *ngIf="errorDetalle">
+
+      <p class="ion-padding" role="alert">
+        {{ errorDetalle }}
+      </p>
+
+    </ion-text>
+
+
+    <!-- LISTA DE CARRERAS -->
+
+    <ion-list
+      [inset]="true"
+      *ngIf="!cargando && !errorLista">
+
+      <ion-item
+        *ngFor="let carrera of carrerasFiltradas"
+        button
+        detail="true"
+        [disabled]="cargandoDetalle"
+        (click)="abrirDetalle(carrera)">
+
+        <ion-icon
+          slot="start"
+          name="book-outline"
+          color="primary">
+        </ion-icon>
+
+        <ion-label>
+
+          <h2>
+            {{ carrera.nombre }}
+          </h2>
+
+          <p>
+            {{ etiquetaTipo(carrera.tipo) }}
+            · {{ carrera.total_creditos }} créditos
+          </p>
+
+          <ion-badge
+            [color]="
+              carrera.estado === 'Activa'
+                ? 'success'
+                : 'medium'
+            ">
+
+            {{ carrera.estado }}
+
+          </ion-badge>
+
+        </ion-label>
+
+      </ion-item>
+
+    </ion-list>
+
+
+    <!-- SIN RESULTADOS -->
+
+    <div
+      class="ion-padding ion-text-center"
+      *ngIf="
+        !cargando &&
+        !errorLista &&
+        carrerasFiltradas.length === 0
+      ">
+
+      <p>
+        No hay carreras que coincidan con la búsqueda.
+      </p>
+
+      <ion-button
+        fill="outline"
+        (click)="nueva()">
+
+        Registrar carrera
+
+      </ion-button>
+
+    </div>
+
+  </ng-container>
+
+
+  <!-- ================================= -->
+  <!-- DETALLE DE CARRERA -->
+  <!-- ================================= -->
+
+  <ng-container
+    *ngIf="vista === 'detalle' && seleccionada as carrera">
+
+    <div class="ion-padding">
+
+      <h2>
+        {{ carrera.nombre }}
+      </h2>
+
+      <ion-badge
+        [color]="
+          carrera.estado === 'Activa'
+            ? 'success'
+            : 'medium'
+        ">
+
+        {{ carrera.estado }}
+
+      </ion-badge>
+
+
+      <!-- INFORMACIÓN ACADÉMICA -->
+
+      <h3>Información académica</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+
+          <ion-label>
+
+            <h3>Identificador</h3>
+
+            <p>{{ carrera.id_carrera }}</p>
+
+          </ion-label>
+
+        </ion-item>
+
+
+        <ion-item>
+
+          <ion-label>
+
+            <h3>Nombre</h3>
+
+            <p>{{ carrera.nombre }}</p>
+
+          </ion-label>
+
+        </ion-item>
+
+
+        <ion-item>
+
+          <ion-label>
+
+            <h3>Tipo</h3>
+
+            <p>
+              {{ etiquetaTipo(carrera.tipo) }}
+            </p>
+
+          </ion-label>
+
+        </ion-item>
+
+
+        <ion-item>
+
+          <ion-label>
+
+            <h3>Total de créditos</h3>
+
+            <p>{{ carrera.total_creditos }}</p>
+
+          </ion-label>
+
+        </ion-item>
+
+
+        <ion-item>
+
+          <ion-label>
+
+            <h3>Estado</h3>
+
+            <p>{{ carrera.estado }}</p>
+
+          </ion-label>
+
+        </ion-item>
+
+      </ion-list>
+
+
+      <!-- ACCIONES -->
+
+      <ion-button
+        expand="block"
+        (click)="editar()">
+
+        <ion-icon
+          slot="start"
+          name="create-outline">
+        </ion-icon>
+
+        Editar carrera
+
+      </ion-button>
+
+
+      <!-- DESACTIVAR -->
+
+      <ion-button
+        *ngIf="carrera.estado === 'Activa'"
+        expand="block"
+        fill="outline"
+        color="danger"
+        [disabled]="desactivando"
+        (click)="confirmarDesactivacion()">
+
+        <ion-icon
+          slot="start"
+          name="ban-outline">
+        </ion-icon>
+
+        Desactivar carrera
+
+      </ion-button>
+
+
+      <!-- REACTIVAR DESDE EDICIÓN -->
+
+      <ion-note
+        *ngIf="carrera.estado === 'Inactiva'">
+
+        Para reactivar esta carrera, pulsa
+        «Editar carrera» y cambia su estado
+        a «Activa».
+
+      </ion-note>
+
+    </div>
+
+  </ng-container>
+
+
+  <!-- ================================= -->
+  <!-- FORMULARIO DE CARRERA -->
+  <!-- ================================= -->
+
+  <ng-container *ngIf="vista === 'formulario'">
+
+    <div class="ion-padding">
+
+      <p>
+        {{
+          editando
+            ? 'Actualiza los datos del programa académico.'
+            : 'Captura los datos de la nueva carrera.'
+        }}
+      </p>
+
+      <h3>Información de la carrera</h3>
+
+      <ion-list [inset]="true">
+
+
+        <!-- NOMBRE -->
+
+        <ion-item>
+
+          <ion-input
+            name="nombre"
+            label="Nombre de la carrera *"
+            labelPlacement="stacked"
+            [(ngModel)]="formulario.nombre"
+            [maxlength]="120"
+            placeholder="Ej. Ingeniería en Sistemas Computacionales">
+          </ion-input>
+
+        </ion-item>
+
+
+        <!-- TIPO -->
+
+        <ion-item>
+
+          <ion-select
+            name="tipo"
+            label="Tipo de carrera *"
+            labelPlacement="stacked"
+            interface="action-sheet"
+            [(ngModel)]="formulario.tipo">
+
+            <ion-select-option value="Ingenieria">
+              Ingeniería
+            </ion-select-option>
+
+            <ion-select-option value="Licenciatura">
+              Licenciatura
+            </ion-select-option>
+
+            <ion-select-option value="Maestria">
+              Maestría
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+
+        <!-- TOTAL DE CRÉDITOS -->
+
+        <ion-item>
+
+          <ion-input
+            name="total_creditos"
+            label="Total de créditos *"
+            labelPlacement="stacked"
+            type="number"
+            inputmode="numeric"
+            min="1"
+            step="1"
+            [(ngModel)]="formulario.total_creditos"
+            placeholder="Ej. 260">
+          </ion-input>
+
+        </ion-item>
+
+
+        <!-- ESTADO: SOLO AL EDITAR -->
+
+        <ion-item *ngIf="editando">
+
+          <ion-select
+            name="estado"
+            label="Estado de la carrera *"
+            labelPlacement="stacked"
+            interface="action-sheet"
+            [(ngModel)]="formulario.estado">
+
+            <ion-select-option value="Activa">
+              Activa
+            </ion-select-option>
+
+            <ion-select-option value="Inactiva">
+              Inactiva
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+      </ion-list>
+
+
+      <!-- AYUDA -->
+
+      <ion-note>
+        Los campos marcados con * son obligatorios.
+      </ion-note>
+
+
+      <!-- ERROR DEL FORMULARIO -->
+
+      <ion-text
+        color="danger"
+        *ngIf="errorFormulario">
+
+        <p role="alert">
+          {{ errorFormulario }}
+        </p>
+
+      </ion-text>
+
+
+      <!-- GUARDAR -->
+
+      <ion-button
+        expand="block"
+        (click)="guardar()"
+        [disabled]="guardando">
+
+        <ion-spinner
+          *ngIf="guardando"
+          slot="start"
+          name="crescent">
+        </ion-spinner>
+
+        <ion-icon
+          *ngIf="!guardando"
+          slot="start"
+          name="save-outline">
+        </ion-icon>
+
+        {{
+          guardando
+            ? 'Guardando...'
+            : editando
+            ? 'Guardar cambios'
+            : 'Registrar carrera'
+        }}
+
+      </ion-button>
+
+
+      <!-- CANCELAR -->
+
+      <ion-button
+        expand="block"
+        fill="clear"
+        (click)="regresar()"
+        [disabled]="guardando">
+
+        Cancelar
+
+      </ion-button>
+
+    </div>
+
+  </ng-container>
+
 </ion-content>
