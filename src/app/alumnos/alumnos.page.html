@@ -199,6 +199,10 @@
             · Semestre {{ alumno.semestre }}
           </p>
 
+          <p *ngIf="alumno.periodo && alumno.anio">
+            Periodo: {{ alumno.periodo }} {{ alumno.anio }}
+          </p>
+
           <ion-badge
             [color]="
               alumno.estado === 'Activo'
@@ -291,6 +295,16 @@
       <p>
         <strong>Estado de inscripción:</strong>
         {{ a.estado_inscripcion || 'No disponible' }}
+      </p>
+
+      <p>
+        <strong>Periodo escolar:</strong>
+        {{ a.periodo || 'No registrado' }}
+      </p>
+
+      <p>
+        <strong>Año escolar:</strong>
+        {{ a.anio ?? 'No registrado' }}
       </p>
 
 
@@ -500,6 +514,44 @@
             [(ngModel)]="formulario.semestre"
             min="1"
             max="20">
+          </ion-input>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-select
+            label="Periodo escolar *"
+            labelPlacement="stacked"
+            interface="alert"
+            name="periodo"
+            [(ngModel)]="formulario.periodo"
+            placeholder="Selecciona un periodo">
+
+            <ion-select-option value="Ene-Jun">
+              Ene-Jun
+            </ion-select-option>
+
+            <ion-select-option value="Ago-Dic">
+              Ago-Dic
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+        <ion-item>
+
+          <ion-input
+            label="Año escolar *"
+            labelPlacement="stacked"
+            type="number"
+            inputmode="numeric"
+            name="anio"
+            [(ngModel)]="formulario.anio"
+            min="2000"
+            max="2100"
+            placeholder="Ej. 2026">
           </ion-input>
 
         </ion-item>

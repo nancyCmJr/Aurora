@@ -1,4 +1,3 @@
-
 import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -59,6 +58,7 @@ type EstadoAlumno =
 
 type Vista = 'lista' | 'detalle' | 'formulario';
 type Filtro = 'Todos' | EstadoAlumno;
+type PeriodoEscolar = 'Ene-Jun' | 'Ago-Dic';
 
 interface Alumno {
   numero_control: string;
@@ -67,6 +67,8 @@ interface Alumno {
   apellidos: string;
   semestre: number;
   estado: EstadoAlumno;
+  periodo?: PeriodoEscolar | null;
+  anio?: number | null;
 
   fecha_registro?: string | null;
   id_carrera?: number | null;
@@ -138,6 +140,8 @@ interface FormularioAlumno {
   apellidos: string;
   semestre: number;
   estado: EstadoAlumno;
+  periodo: PeriodoEscolar | '';
+  anio: number | null;
   id_carrera: number | null;
   detalle: DetalleAlumno;
 }
@@ -154,6 +158,8 @@ function nuevoFormulario(): FormularioAlumno {
     apellidos: '',
     semestre: 1,
     estado: 'Activo',
+    periodo: '',
+    anio: new Date().getFullYear(),
     id_carrera: null,
 
     detalle: {
@@ -548,6 +554,10 @@ export class AlumnosPage {
 
       semestre: Number(alumno.semestre) || 1,
       estado: alumno.estado,
+      periodo: alumno.periodo === 'Ene-Jun' || alumno.periodo === 'Ago-Dic'
+        ? alumno.periodo
+        : '',
+      anio: alumno.anio == null ? null : Number(alumno.anio),
 
       id_carrera: alumno.id_carrera == null
         ? null
@@ -673,6 +683,18 @@ export class AlumnosPage {
       return;
     }
 
+    // Validar periodo y año escolar
+    if (f.periodo !== 'Ene-Jun' && f.periodo !== 'Ago-Dic') {
+      this.errorFormulario = 'Selecciona el periodo escolar (Ene-Jun o Ago-Dic).';
+      return;
+    }
+
+    const anio = Number(f.anio);
+    if (f.anio === null || !Number.isInteger(anio) || anio < 2000 || anio > 2100) {
+      this.errorFormulario = 'El año escolar debe ser un número entre 2000 y 2100.';
+      return;
+    }
+
     // Validar carrera
     if (
       !f.id_carrera ||
@@ -754,6 +776,8 @@ export class AlumnosPage {
           apellidos: f.apellidos,
           semestre: Number(f.semestre),
           estado: f.estado,
+          periodo: f.periodo,
+          anio,
           id_carrera: Number(f.id_carrera),
           detalle,
         }
@@ -763,6 +787,8 @@ export class AlumnosPage {
           seg_nombre: f.seg_nombre || null,
           apellidos: f.apellidos,
           semestre: Number(f.semestre),
+          periodo: f.periodo,
+          anio,
           id_carrera: Number(f.id_carrera),
           ...detalle,
         };
