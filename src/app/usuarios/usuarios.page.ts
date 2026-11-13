@@ -56,19 +56,27 @@ import {
 
 interface UsuarioListado extends UsuarioAurora {
   fecha_creacion?: string;
+  nombre_completo?: string;
 }
 
 interface RespuestaListado {
-  success: boolean;
+  success?: boolean;
   message?: string;
   total?: number;
   usuarios?: UsuarioListado[];
+  // Algunas APIs responden con data en lugar de usuarios.
+  data?: UsuarioListado[] | {
+    usuarios?: UsuarioListado[];
+    data?: UsuarioListado[];
+    total?: number;
+  };
 }
 
 interface RespuestaConsulta {
-  success: boolean;
+  success?: boolean;
   message?: string;
   usuario?: UsuarioListado;
+  data?: UsuarioListado | { usuario?: UsuarioListado };
 }
 
 interface RespuestaOperacion {
@@ -169,15 +177,25 @@ export class UsuariosPage {
   }
 
   get usuariosFiltrados(): UsuarioListado[] {
-    const texto = this.busqueda.trim().toLocaleLowerCase();
+    const texto = this.busqueda.trim().toLowerCase();
+
     return this.usuarios.filter((usuario) => {
       if (this.filtroEstado !== 'Todos' && usuario.estado !== this.filtroEstado) {
         return false;
       }
       if (!texto) return true;
-      return [usuario.codigo, usuario.nombre_usuario, usuario.correo, usuario.rol,
-        usuario.numero_control ?? '', String(usuario.id_docente ?? '')]
-        .some((campo) => campo.toLocaleLowerCase().includes(texto));
+
+      // Convertir a string evita que un valor numérico o nulo rompa el listado.
+      const campos = [
+        usuario.codigo,
+        usuario.nombre_usuario,
+        usuario.nombre_completo,
+        usuario.correo,
+        usuario.rol,
+        usuario.numero_control,
+        usuario.id_docente,
+      ];
+      return campos.some((campo) => String(campo ?? '').toLowerCase().includes(texto));
     });
   }
 
@@ -204,23 +222,60 @@ export class UsuariosPage {
   }
 
   cargarUsuarios(refresher?: HTMLIonRefresherElement): void {
+    const url = `${this.apiUrl}/listar.php`;
     this.errorListado = '';
     if (!refresher) this.cargando = true;
 
-    this.http.get<RespuestaListado>(`${this.apiUrl}/listar.php`)
+    this.http.get<RespuestaListado>(url)
       .pipe(finalize(() => {
         this.cargando = false;
         void refresher?.complete();
       }))
       .subscribe({
         next: (respuesta) => {
-          if (!respuesta.success || !Array.isArray(respuesta.usuarios)) {
-            this.errorListado = respuesta.message || 'No se pudo cargar la lista.';
+          // Durante el desarrollo, permite ver el JSON real en la consola.
+          console.info('[Aurora] Respuesta de usuarios/listar.php:', respuesta);
+
+          if (!respuesta || respuesta.success === false) {
+            this.usuarios = [];
+            this.errorListado = respuesta?.message || 'La API no pudo obtener los usuarios.';
             return;
           }
-          this.usuarios = respuesta.usuarios;
+
+          const datos = respuesta.data;
+          const registros = Array.isArray(respuesta.usuarios)
+            ? respuesta.usuarios
+            : Array.isArray(datos)
+              ? datos
+              : datos && Array.isArray(datos.usuarios)
+                ? datos.usuarios
+                : datos && Array.isArray(datos.data)
+                  ? datos.data
+                  : null;
+
+          if (registros === null) {
+            this.usuarios = [];
+            this.errorListado =
+              'El servidor respondió, pero no envió una lista de usuarios. ' +
+              'Abre la consola y revisa el JSON de usuarios/listar.php.';
+            return;
+          }
+
+          // Solo conservar objetos con código; nunca crear usuarios ficticios.
+          this.usuarios = registros.filter((registro): registro is UsuarioListado =>
+            !!registro && typeof registro === 'object' &&
+            typeof registro.codigo === 'string'
+          );
+
+          if (registros.length > 0 && this.usuarios.length === 0) {
+            this.errorListado =
+              'La API devolvió registros, pero no incluyen el campo codigo. ' +
+              'Revisa el SELECT de usuarios/listar.php.';
+          }
         },
         error: (error: HttpErrorResponse) => {
+          this.usuarios = [];
+          console.error('[Aurora] Error consultando ' + url, error);
           this.errorListado = this.mensajeDeError(error);
         },
       });
@@ -406,12 +461,21 @@ export class UsuariosPage {
 
   private mensajeDeError(error: HttpErrorResponse): string {
     if (error.status === 0) {
-      return 'Sin conexión con la API. Comprueba tu red o la dirección del servidor.';
+      return 'No se pudo conectar con la API. Verifica la URL del servidor, CORS y tu red.';
     }
     const mensaje = error.error?.message;
     if (typeof mensaje === 'string' && mensaje.trim()) return mensaje;
+    if (error.status === 404) {
+      return 'No se encontró el endpoint PHP (HTTP 404). Verifica la carpeta usuarios y listar.php.';
+    }
+    if (error.status === 200) {
+      return 'La API respondió, pero no devolvió JSON válido. Revisa errores o avisos PHP.';
+    }
+    if (error.status === 500) {
+      return 'Error interno del servidor (HTTP 500). Revisa el PHP, conn.php y la consulta SQL.';
+    }
     if (error.status === 409) return 'Ya existe un registro con esos datos.';
-    return 'Ocurrió un error al comunicarse con el servidor.';
+    return `Error HTTP ${error.status} al comunicarse con el servidor.`;
   }
 
   private async mostrarMensaje(mensaje: string): Promise<void> {

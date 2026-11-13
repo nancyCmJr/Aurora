@@ -90,7 +90,7 @@
         </ion-icon>
 
         <ion-label>
-          <h2>{{ usuario.nombre_usuario }}</h2>
+          <h2>{{ usuario.nombre_completo || usuario.nombre_usuario }}</h2>
           <p>{{ usuario.correo }}</p>
           <p>{{ usuario.codigo }} · {{ usuario.rol }}</p>
           <ion-badge
@@ -107,7 +107,8 @@
       class="ion-text-center ion-padding">
       <ion-icon name="people-outline" size="large" color="medium"></ion-icon>
       <h3>No hay usuarios para mostrar</h3>
-      <p>Prueba otros filtros o registra una nueva cuenta.</p>
+      <p *ngIf="usuarios.length === 0">La API no devolvió registros. Comprueba el endpoint y la base de datos.</p>
+      <p *ngIf="usuarios.length > 0">Prueba otros filtros de búsqueda.</p>
       <ion-button (click)="nuevoUsuario()" fill="outline">Registrar usuario</ion-button>
     </div>
   </ng-container>
