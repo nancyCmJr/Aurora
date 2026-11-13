@@ -1,13 +1,903 @@
+
 <ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title>kardex</ion-title>
+
+  <ion-toolbar color="primary">
+
+    <ion-buttons slot="start">
+
+      <ion-back-button
+        *ngIf="vista === 'lista'"
+        defaultHref="/home">
+      </ion-back-button>
+
+      <ion-button
+        *ngIf="vista !== 'lista'"
+        (click)="regresar()"
+        aria-label="Regresar">
+
+        <ion-icon
+          name="arrow-back-outline"
+          slot="icon-only">
+        </ion-icon>
+
+      </ion-button>
+
+    </ion-buttons>
+
+    <ion-title>
+      {{
+        vista === 'lista'
+          ? 'Kardex'
+          : vista === 'detalle'
+          ? 'Detalle académico'
+          : editando
+          ? 'Editar registro'
+          : 'Nuevo registro'
+      }}
+    </ion-title>
+
+    <ion-buttons
+      slot="end"
+      *ngIf="vista === 'lista' && esAdmin">
+
+      <ion-button
+        (click)="nuevo()"
+        aria-label="Registrar en kardex">
+
+        <ion-icon
+          name="add-outline"
+          slot="icon-only">
+        </ion-icon>
+
+      </ion-button>
+
+    </ion-buttons>
+
   </ion-toolbar>
+
 </ion-header>
 
+
 <ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">kardex</ion-title>
-    </ion-toolbar>
-  </ion-header>
+
+  <!-- ================================= -->
+  <!-- LISTADO / HISTORIAL -->
+  <!-- ================================= -->
+
+  <ng-container *ngIf="vista === 'lista'">
+
+    <ion-refresher
+      slot="fixed"
+      (ionRefresh)="refrescar($event)">
+
+      <ion-refresher-content>
+      </ion-refresher-content>
+
+    </ion-refresher>
+
+
+    <div class="ion-padding">
+
+      <h2>
+        {{
+          esAlumno
+            ? 'Mi historial académico'
+            : 'Registros de kardex'
+        }}
+      </h2>
+
+      <p>
+        {{
+          esAlumno
+            ? 'Consulta tus materias, periodos y resultados.'
+            : 'Consulta el historial académico por alumno, materia o periodo.'
+        }}
+      </p>
+
+      <!-- BUSCADOR -->
+
+      <ion-searchbar
+        name="busqueda"
+        [(ngModel)]="busqueda"
+        [debounce]="200"
+        [placeholder]="
+          esAlumno
+            ? 'Buscar materia'
+            : 'Buscar alumno, control o materia'
+        ">
+      </ion-searchbar>
+
+
+      <!-- FILTRO POR ESTADO -->
+
+      <ion-item>
+
+        <ion-select
+          name="filtroEstado"
+          label="Estado"
+          labelPlacement="stacked"
+          interface="action-sheet"
+          [(ngModel)]="filtroEstado">
+
+          <ion-select-option value="Todos">
+            Todos
+          </ion-select-option>
+
+          <ion-select-option value="Cursando">
+            Cursando
+          </ion-select-option>
+
+          <ion-select-option value="Aprobada">
+            Aprobada
+          </ion-select-option>
+
+          <ion-select-option value="Reprobada">
+            Reprobada
+          </ion-select-option>
+
+          <ion-select-option value="Baja">
+            Baja
+          </ion-select-option>
+
+        </ion-select>
+
+      </ion-item>
+
+
+      <!-- FILTRO POR AÑO -->
+
+      <ion-item>
+
+        <ion-select
+          name="filtroAnio"
+          label="Año"
+          labelPlacement="stacked"
+          interface="action-sheet"
+          [(ngModel)]="filtroAnio">
+
+          <ion-select-option value="Todos">
+            Todos los años
+          </ion-select-option>
+
+          <ion-select-option
+            *ngFor="let anio of aniosDisponibles"
+            [value]="anio">
+
+            {{ anio }}
+
+          </ion-select-option>
+
+        </ion-select>
+
+      </ion-item>
+
+
+      <ion-note
+        *ngIf="!cargando && !errorLista">
+
+        {{ registrosFiltrados.length }}
+        registro(s) encontrado(s)
+
+      </ion-note>
+
+    </div>
+
+
+    <!-- CARGANDO -->
+
+    <div
+      *ngIf="cargando || cargandoDetalle"
+      class="ion-padding ion-text-center">
+
+      <ion-spinner name="crescent">
+      </ion-spinner>
+
+      <p>
+        {{
+          cargandoDetalle
+            ? 'Abriendo registro...'
+            : 'Cargando historial...'
+        }}
+      </p>
+
+    </div>
+
+
+    <!-- ERROR DE LISTADO -->
+
+    <ion-text
+      color="danger"
+      *ngIf="errorLista">
+
+      <p
+        role="alert"
+        class="ion-padding">
+
+        {{ errorLista }}
+
+      </p>
+
+    </ion-text>
+
+
+    <!-- ERROR DE CONSULTA -->
+
+    <ion-text
+      color="danger"
+      *ngIf="errorDetalle">
+
+      <p
+        role="alert"
+        class="ion-padding">
+
+        {{ errorDetalle }}
+
+      </p>
+
+    </ion-text>
+
+
+    <!-- REINTENTAR -->
+
+    <ion-button
+      *ngIf="errorLista && !cargando"
+      expand="block"
+      fill="outline"
+      (click)="cargarKardex()">
+
+      Reintentar
+
+    </ion-button>
+
+
+    <!-- LISTADO -->
+
+    <ion-list
+      [inset]="true"
+      *ngIf="!cargando && !errorLista">
+
+      <ion-item
+        *ngFor="let r of registrosFiltrados"
+        button
+        detail="true"
+        [disabled]="cargandoDetalle"
+        (click)="abrirDetalle(r)">
+
+        <ion-icon
+          slot="start"
+          name="book-outline"
+          color="primary">
+        </ion-icon>
+
+        <ion-label>
+
+          <h2>
+            {{ nombreMateria(r) }}
+          </h2>
+
+          <p>
+            {{ r.clave_materia || 'Sin clave' }}
+            · {{ r.periodo }} {{ r.anio }}
+          </p>
+
+          <p *ngIf="!esAlumno">
+            {{ nombreAlumno(r) }}
+            · {{ r.numero_control }}
+          </p>
+
+          <p>
+            Grupo:
+            {{ r.clave_grupo || r.id_grupo }}
+          </p>
+
+          <p>
+            Calificación:
+            {{
+              r.calificacion === null
+                ? 'Pendiente'
+                : r.calificacion
+            }}
+          </p>
+
+          <ion-badge
+            [color]="colorEstado(r.estado)">
+
+            {{ r.estado }}
+
+          </ion-badge>
+
+        </ion-label>
+
+      </ion-item>
+
+    </ion-list>
+
+
+    <!-- SIN RESULTADOS -->
+
+    <div
+      class="ion-padding ion-text-center"
+      *ngIf="
+        !cargando &&
+        !errorLista &&
+        registrosFiltrados.length === 0
+      ">
+
+      <p>
+        No se encontraron registros con estos filtros.
+      </p>
+
+      <ion-button
+        *ngIf="esAdmin"
+        fill="outline"
+        (click)="nuevo()">
+
+        Agregar registro
+
+      </ion-button>
+
+    </div>
+
+  </ng-container>
+
+
+  <!-- ================================= -->
+  <!-- DETALLE ACADÉMICO -->
+  <!-- ================================= -->
+
+  <ng-container
+    *ngIf="vista === 'detalle' && seleccionado as r">
+
+    <div class="ion-padding">
+
+      <h2>
+        {{ nombreMateria(r) }}
+      </h2>
+
+      <p>
+        {{ r.clave_materia || 'Clave no disponible' }}
+      </p>
+
+      <ion-badge
+        [color]="colorEstado(r.estado)">
+
+        {{ r.estado }}
+
+      </ion-badge>
+
+
+      <h3>Información académica</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+          <ion-label>
+            <h3>Alumno</h3>
+            <p>{{ nombreAlumno(r) }}</p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Número de control</h3>
+            <p>{{ r.numero_control }}</p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Grupo</h3>
+            <p>
+              {{ r.clave_grupo || r.id_grupo }}
+            </p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Periodo</h3>
+            <p>
+              {{ r.periodo }} {{ r.anio }}
+            </p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Calificación</h3>
+
+            <p>
+              {{
+                r.calificacion === null
+                  ? 'Sin calificar'
+                  : r.calificacion
+              }}
+            </p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Tipo de calificación</h3>
+            <p>
+              {{ etiquetaTipo(r.tipo_calf) }}
+            </p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Tipo de curso</h3>
+            <p>
+              {{ etiquetaCurso(r.curso) }}
+            </p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item *ngIf="r.docente">
+          <ion-label>
+            <h3>Docente</h3>
+            <p>{{ r.docente }}</p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item *ngIf="r.creditos != null">
+          <ion-label>
+            <h3>Créditos</h3>
+            <p>{{ r.creditos }}</p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Identificador de registro</h3>
+            <p>{{ r.id_kardex }}</p>
+          </ion-label>
+        </ion-item>
+
+      </ion-list>
+
+
+      <!-- REGISTRO CON BAJA -->
+
+      <ion-note *ngIf="r.estado === 'Baja'">
+
+        Este registro se conserva como parte
+        del historial, aunque esté dado de baja.
+
+      </ion-note>
+
+
+      <!-- ACCIONES ADMINISTRATIVAS -->
+
+      <ng-container
+        *ngIf="esAdmin && r.estado !== 'Baja'">
+
+        <ion-button
+          expand="block"
+          (click)="editar()">
+
+          <ion-icon
+            name="create-outline"
+            slot="start">
+          </ion-icon>
+
+          Editar resultado
+
+        </ion-button>
+
+
+        <ion-button
+          expand="block"
+          fill="outline"
+          color="danger"
+          [disabled]="dandoDeBaja"
+          (click)="confirmarBaja()">
+
+          <ion-icon
+            name="ban-outline"
+            slot="start">
+          </ion-icon>
+
+          Dar de baja del kardex
+
+        </ion-button>
+
+      </ng-container>
+
+    </div>
+
+  </ng-container>
+
+
+  <!-- ================================= -->
+  <!-- FORMULARIO DE REGISTRO / EDICIÓN -->
+  <!-- ================================= -->
+
+  <ng-container
+    *ngIf="vista === 'formulario' && esAdmin">
+
+    <div class="ion-padding">
+
+      <p>
+        {{
+          editando
+            ? 'Actualiza el resultado sin cambiar el alumno ni el grupo histórico.'
+            : 'Registra la inscripción y el estado académico de un alumno en un grupo.'
+        }}
+      </p>
+
+
+      <!-- ALUMNO Y GRUPO -->
+
+      <h3>Alumno y grupo</h3>
+
+      <ion-list [inset]="true">
+
+        <!-- ALUMNO NUEVO -->
+
+        <ion-item *ngIf="!editando">
+
+          <ion-select
+            name="numero_control"
+            label="Alumno *"
+            labelPlacement="stacked"
+            interface="alert"
+            [(ngModel)]="formulario.numero_control"
+            [disabled]="cargandoCatalogos">
+
+            <ion-select-option
+              *ngFor="let a of alumnos"
+              [value]="a.numero_control">
+
+              {{ a.numero_control }}
+              · {{ a.nombre }}
+              {{ a.seg_nombre }}
+              {{ a.apellidos }}
+
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+
+        <!-- ALUMNO EN EDICIÓN -->
+
+        <ion-item *ngIf="editando">
+
+          <ion-label>
+
+            <h3>Número de control</h3>
+            <p>{{ formulario.numero_control }}</p>
+
+          </ion-label>
+
+        </ion-item>
+
+
+        <!-- GRUPO NUEVO -->
+
+        <ion-item *ngIf="!editando">
+
+          <ion-select
+            name="id_grupo"
+            label="Grupo abierto *"
+            labelPlacement="stacked"
+            interface="alert"
+            [(ngModel)]="formulario.id_grupo"
+            [disabled]="cargandoCatalogos">
+
+            <ion-select-option
+              *ngFor="let g of gruposDisponibles"
+              [value]="g.id_grupo">
+
+              {{ g.clave_grupo }}
+              ·
+              {{
+                g.nombre_materia ||
+                g.materia ||
+                'Grupo ' + g.id_grupo
+              }}
+
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+
+        <!-- GRUPO EN EDICIÓN -->
+
+        <ion-item *ngIf="editando">
+
+          <ion-label>
+
+            <h3>Grupo</h3>
+
+            <p>
+              {{
+                seleccionado?.clave_grupo ||
+                formulario.id_grupo
+              }}
+            </p>
+
+          </ion-label>
+
+        </ion-item>
+
+
+        <!-- PERIODO -->
+
+        <ion-item>
+
+          <ion-input
+            name="periodo"
+            label="Periodo *"
+            labelPlacement="stacked"
+            [(ngModel)]="formulario.periodo"
+            [maxlength]="20"
+            [readonly]="editando"
+            placeholder="Ej. Enero-Junio">
+          </ion-input>
+
+        </ion-item>
+
+
+        <!-- AÑO -->
+
+        <ion-item>
+
+          <ion-input
+            name="anio"
+            label="Año *"
+            labelPlacement="stacked"
+            type="number"
+            inputmode="numeric"
+            [min]="1901"
+            [max]="2155"
+            [(ngModel)]="formulario.anio"
+            [readonly]="editando">
+          </ion-input>
+
+        </ion-item>
+
+      </ion-list>
+
+
+      <!-- CARGANDO CATÁLOGOS -->
+
+      <div
+        *ngIf="cargandoCatalogos"
+        class="ion-padding ion-text-center">
+
+        <ion-spinner name="crescent">
+        </ion-spinner>
+
+        <p>
+          Cargando alumnos y grupos...
+        </p>
+
+      </div>
+
+
+      <!-- ERROR DE CATÁLOGOS -->
+
+      <ion-text
+        color="danger"
+        *ngIf="errorCatalogos">
+
+        <p role="alert">
+          {{ errorCatalogos }}
+        </p>
+
+      </ion-text>
+
+
+      <ion-button
+        *ngIf="errorCatalogos"
+        fill="clear"
+        (click)="cargarCatalogos()">
+
+        Reintentar cargar alumnos y grupos
+
+      </ion-button>
+
+
+      <!-- RESULTADO ACADÉMICO -->
+
+      <h3>Resultado académico</h3>
+
+      <ion-list [inset]="true">
+
+        <!-- TIPO DE CURSO -->
+
+        <ion-item>
+
+          <ion-select
+            name="curso"
+            label="Tipo de curso *"
+            labelPlacement="stacked"
+            interface="action-sheet"
+            [(ngModel)]="formulario.curso">
+
+            <ion-select-option value="Ordinario">
+              Ordinario
+            </ion-select-option>
+
+            <ion-select-option value="Repeticion">
+              Repetición
+            </ion-select-option>
+
+            <ion-select-option value="Especial">
+              Especial
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+
+        <!-- TIPO DE CALIFICACIÓN -->
+
+        <ion-item>
+
+          <ion-select
+            name="tipo_calf"
+            label="Tipo de calificación *"
+            labelPlacement="stacked"
+            interface="action-sheet"
+            [(ngModel)]="formulario.tipo_calf">
+
+            <ion-select-option value="Ordinario">
+              Ordinario
+            </ion-select-option>
+
+            <ion-select-option value="Recuperacion">
+              Recuperación
+            </ion-select-option>
+
+            <ion-select-option value="No aprobatorio">
+              No aprobatorio
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+
+        <!-- ESTADO -->
+
+        <ion-item>
+
+          <ion-select
+            name="estado"
+            label="Estado *"
+            labelPlacement="stacked"
+            interface="action-sheet"
+            [(ngModel)]="formulario.estado"
+            (ionChange)="cambiarEstado()">
+
+            <ion-select-option value="Cursando">
+              Cursando
+            </ion-select-option>
+
+            <ion-select-option value="Aprobada">
+              Aprobada
+            </ion-select-option>
+
+            <ion-select-option value="Reprobada">
+              Reprobada
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+
+        <!-- CALIFICACIÓN -->
+
+        <ion-item
+          *ngIf="formulario.estado !== 'Cursando'">
+
+          <ion-input
+            name="calificacion"
+            label="Calificación (0 a 100) *"
+            labelPlacement="stacked"
+            type="number"
+            inputmode="numeric"
+            [min]="0"
+            [max]="100"
+            [step]="1"
+            [(ngModel)]="formulario.calificacion">
+          </ion-input>
+
+        </ion-item>
+
+      </ion-list>
+
+
+      <!-- AYUDA -->
+
+      <ion-note
+        *ngIf="formulario.estado === 'Cursando'">
+
+        Mientras está cursando, la calificación
+        debe permanecer vacía.
+
+      </ion-note>
+
+      <ion-note>
+
+        Los campos con * son obligatorios.
+        PHP verifica las reglas académicas,
+        inscripciones, cupo, retícula y posibles
+        registros duplicados.
+
+      </ion-note>
+
+
+      <!-- ERRORES -->
+
+      <ion-text
+        color="danger"
+        *ngIf="errorFormulario">
+
+        <p role="alert">
+          {{ errorFormulario }}
+        </p>
+
+      </ion-text>
+
+
+      <!-- GUARDAR -->
+
+      <ion-button
+        expand="block"
+        (click)="guardar()"
+        [disabled]="
+          guardando ||
+          cargandoCatalogos ||
+          !!errorCatalogos
+        ">
+
+        <ion-spinner
+          *ngIf="guardando"
+          slot="start"
+          name="crescent">
+        </ion-spinner>
+
+        <ion-icon
+          *ngIf="!guardando"
+          slot="start"
+          name="save-outline">
+        </ion-icon>
+
+        {{
+          guardando
+            ? 'Guardando...'
+            : editando
+            ? 'Guardar cambios'
+            : 'Registrar en kardex'
+        }}
+
+      </ion-button>
+
+
+      <!-- CANCELAR -->
+
+      <ion-button
+        expand="block"
+        fill="clear"
+        (click)="regresar()"
+        [disabled]="guardando">
+
+        Cancelar
+
+      </ion-button>
+
+    </div>
+
+  </ng-container>
+
 </ion-content>
