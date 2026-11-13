@@ -1,0 +1,65 @@
+<ion-content [fullscreen]="true" class="ion-padding">
+
+  <div class="ion-text-center ion-padding-top ion-margin-top">
+    <ion-icon name="school-outline" color="primary" size="large"></ion-icon>
+    <h1>Aurora</h1>
+    <p>Sistema de gestión escolar</p>
+  </div>
+
+  <section class="ion-padding-top">
+    <h2>Iniciar sesión</h2>
+    <p>Ingresa con tu cuenta institucional.</p>
+
+    <form (ngSubmit)="iniciarSesion()" novalidate>
+      <ion-list [inset]="true">
+        <ion-item>
+          <ion-input
+            name="correo"
+            label="Correo electrónico"
+            labelPlacement="stacked"
+            type="email"
+            inputmode="email"
+            autocomplete="username"
+            autocapitalize="off"
+            [clearInput]="true"
+            [disabled]="cargando"
+            [(ngModel)]="correo"
+            placeholder="tu.correo@institucion.edu.mx"
+            required>
+          </ion-input>
+        </ion-item>
+
+        <ion-item>
+          <ion-input
+            name="contra"
+            label="Contraseña"
+            labelPlacement="stacked"
+            type="password"
+            autocomplete="current-password"
+            [disabled]="cargando"
+            [(ngModel)]="contra"
+            placeholder="Escribe tu contraseña"
+            required>
+            <ion-input-password-toggle slot="end"></ion-input-password-toggle>
+          </ion-input>
+        </ion-item>
+      </ion-list>
+
+      <ion-note *ngIf="mensajeError" color="danger">
+        <p class="ion-padding-horizontal" role="alert">{{ mensajeError }}</p>
+      </ion-note>
+
+      <div class="ion-padding-horizontal ion-padding-top">
+        <ion-button type="submit" expand="block" [disabled]="cargando">
+          <ion-spinner *ngIf="cargando" name="crescent" slot="start"></ion-spinner>
+          <ion-icon *ngIf="!cargando" name="log-in-outline" slot="start"></ion-icon>
+          {{ cargando ? 'Ingresando...' : 'Iniciar sesión' }}
+        </ion-button>
+      </div>
+    </form>
+  </section>
+
+  <p class="ion-text-center ion-padding-top">
+    Acceso para alumnos, docentes y administradores.
+  </p>
+</ion-content>
