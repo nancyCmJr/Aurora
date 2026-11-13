@@ -1,144 +1,71 @@
-
 <ion-header [translucent]="true">
-
   <ion-toolbar color="primary">
-
     <ion-title>Aurora</ion-title>
 
-    <!-- Cerrar sesión -->
     <ion-buttons slot="end">
-
       <ion-button
         (click)="confirmarCerrarSesion()"
         aria-label="Cerrar sesión"
-        title="Cerrar sesión">
-
-        <ion-icon
-          name="log-out-outline"
-          slot="icon-only">
-        </ion-icon>
-
+        title="Cerrar sesión"
+      >
+        <ion-icon name="log-out-outline" slot="icon-only"></ion-icon>
       </ion-button>
-
     </ion-buttons>
-
   </ion-toolbar>
-
 </ion-header>
 
-
 <ion-content [fullscreen]="true">
-
-  <div class="ion-padding" *ngIf="usuario as u">
-
-    <!-- INFORMACIÓN DEL USUARIO -->
-
+  <div class="ion-padding" *ngIf="usuario() as u">
+    <!-- Información de la persona que inició sesión -->
     <ion-card>
-
       <ion-card-header>
-
-        <ion-card-subtitle>
-          Panel principal
-        </ion-card-subtitle>
-
-        <ion-card-title>
-          ¡Hola, {{ u.nombre_usuario }}!
-        </ion-card-title>
-
+        <ion-card-subtitle>Panel principal</ion-card-subtitle>
+        <ion-card-title>¡Hola, {{ u.nombre_usuario }}!</ion-card-title>
       </ion-card-header>
 
-
       <ion-card-content>
+        <ion-badge color="primary">{{ u.rol }}</ion-badge>
+        <p class="ion-margin-top">{{ u.correo }}</p>
 
-        <ion-badge color="primary">
-          {{ u.rol }}
-        </ion-badge>
-
-        <p class="ion-margin-top">
-          {{ u.correo }}
+        <p *ngIf="u.rol === 'Alumno' && u.numero_control">
+          Número de control: {{ u.numero_control }}
         </p>
 
-        <!-- Datos del alumno -->
-        <p
-          *ngIf="u.rol === 'Alumno' && u.numero_control">
-
-          Número de control:
-          {{ u.numero_control }}
-
+        <p *ngIf="u.rol === 'Docente' && u.id_docente">
+          ID docente: {{ u.id_docente }}
         </p>
-
-        <!-- Datos del docente -->
-        <p
-          *ngIf="u.rol === 'Docente' && u.id_docente">
-
-          ID docente:
-          {{ u.id_docente }}
-
-        </p>
-
       </ion-card-content>
-
     </ion-card>
 
-
-    <!-- MENÚ PRINCIPAL -->
-
-    <h2 class="ion-padding-start ion-padding-top">
-      Mis módulos
-    </h2>
-
+    <h2 class="ion-padding-start ion-padding-top">Mis módulos</h2>
     <p class="ion-padding-horizontal">
       Selecciona una opción para continuar.
     </p>
 
-
-    <!-- SECCIONES SEGÚN EL ROL -->
-
-    <ion-list
-      [inset]="true"
-      *ngFor="let seccion of secciones">
-
+    <!-- Sólo aparecen las secciones autorizadas para el rol -->
+    <ion-list [inset]="true" *ngFor="let seccion of secciones()">
       <ion-list-header>
-
-        <ion-label>
-          {{ seccion.titulo }}
-        </ion-label>
-
+        <ion-label>{{ seccion.titulo }}</ion-label>
       </ion-list-header>
-
-
-      <!-- MÓDULOS -->
 
       <ion-item
         *ngFor="let modulo of seccion.modulos"
         button
         [routerLink]="modulo.ruta"
-        [detail]="true">
-
+        [detail]="true"
+      >
         <ion-icon
           slot="start"
           [name]="modulo.icono"
           color="primary"
-          aria-hidden="true">
-        </ion-icon>
-
+          aria-hidden="true"
+        ></ion-icon>
 
         <ion-label>
-
-          <h2>
-            {{ modulo.titulo }}
-          </h2>
-
-          <p>
-            {{ modulo.descripcion }}
-          </p>
-
+          <h2>{{ modulo.titulo }}</h2>
+          <p>{{ modulo.descripcion }}</p>
         </ion-label>
-
       </ion-item>
-
     </ion-list>
-
   </div>
-
 </ion-content>

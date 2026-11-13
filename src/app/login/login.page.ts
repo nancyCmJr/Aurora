@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -40,6 +40,7 @@ import { AuthService } from '../services/auth.service';
   ],
 })
 export class LoginPage {
+  private readonly cdr = inject(ChangeDetectorRef);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
@@ -70,10 +71,14 @@ export class LoginPage {
 
     this.cargando = true;
     this.auth.login(correo, this.contra)
-      .pipe(finalize(() => (this.cargando = false)))
+      .pipe(finalize(() => {
+        this.cargando = false;
+        this.cdr.markForCheck();
+      }))
       .subscribe({
         next: (respuesta) => {
-          if (respuesta.success && respuesta.data?.estado === 'Activo') {
+          this.cdr.markForCheck();
+          if (respuesta.success && this.auth.estaAutenticado()) {
             this.contra = '';
             void this.router.navigateByUrl('/home', { replaceUrl: true });
           } else {
@@ -81,6 +86,7 @@ export class LoginPage {
           }
         },
         error: (error: HttpErrorResponse) => {
+          this.cdr.markForCheck();
           if (error.status === 0) {
             this.mensajeError = 'No se pudo conectar con el servidor. Revisa tu conexión.';
           } else {

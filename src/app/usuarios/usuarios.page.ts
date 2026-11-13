@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
@@ -148,6 +148,7 @@ function formularioVacio(): FormularioUsuario {
   ],
 })
 export class UsuariosPage {
+  private readonly cdr = inject(ChangeDetectorRef);
   private readonly http = inject(HttpClient);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
@@ -219,6 +220,7 @@ export class UsuariosPage {
     }
     this.vista = 'lista';
     this.cargarUsuarios();
+    this.cdr.markForCheck();
   }
 
   cargarUsuarios(refresher?: HTMLIonRefresherElement): void {
@@ -230,11 +232,13 @@ export class UsuariosPage {
       .pipe(finalize(() => {
         this.cargando = false;
         void refresher?.complete();
+        this.cdr.markForCheck();
       }))
       .subscribe({
         next: (respuesta) => {
           // Durante el desarrollo, permite ver el JSON real en la consola.
           console.info('[Aurora] Respuesta de usuarios/listar.php:', respuesta);
+          this.cdr.markForCheck();
 
           if (!respuesta || respuesta.success === false) {
             this.usuarios = [];
@@ -276,6 +280,7 @@ export class UsuariosPage {
         error: (error: HttpErrorResponse) => {
           this.usuarios = [];
           console.error('[Aurora] Error consultando ' + url, error);
+          this.cdr.markForCheck();
           this.errorListado = this.mensajeDeError(error);
         },
       });
@@ -299,9 +304,13 @@ export class UsuariosPage {
 
     this.http.get<RespuestaConsulta>(`${this.apiUrl}/consultar.php`, {
       params: { codigo: usuario.codigo },
-    }).pipe(finalize(() => this.cargandoDetalle = false))
+    }).pipe(finalize(() => {
+      this.cargandoDetalle = false;
+      this.cdr.markForCheck();
+    }))
       .subscribe({
         next: (respuesta) => {
+          this.cdr.markForCheck();
           if (!respuesta.success || !respuesta.usuario) {
             this.errorListado = respuesta.message || 'No se pudo consultar el usuario.';
             return;
@@ -323,6 +332,7 @@ export class UsuariosPage {
         },
         error: (error: HttpErrorResponse) => {
           this.errorListado = this.mensajeDeError(error);
+          this.cdr.markForCheck();
         },
       });
   }
@@ -400,9 +410,13 @@ export class UsuariosPage {
     this.guardando = true;
 
     this.http.post<RespuestaOperacion>(`${this.apiUrl}/${endpoint}`, datos)
-      .pipe(finalize(() => this.guardando = false))
+      .pipe(finalize(() => {
+        this.guardando = false;
+        this.cdr.markForCheck();
+      }))
       .subscribe({
         next: (respuesta) => {
+          this.cdr.markForCheck();
           if (!respuesta.success) {
             this.errorFormulario = respuesta.message || 'No fue posible guardar el usuario.';
             return;
@@ -414,6 +428,7 @@ export class UsuariosPage {
         },
         error: (error: HttpErrorResponse) => {
           this.errorFormulario = this.mensajeDeError(error);
+          this.cdr.markForCheck();
         },
       });
   }
@@ -442,9 +457,13 @@ export class UsuariosPage {
     this.errorFormulario = '';
     this.http.post<RespuestaOperacion>(`${this.apiUrl}/eliminar.php`, {
       codigo: this.formulario.codigo,
-    }).pipe(finalize(() => this.desactivando = false))
+    }).pipe(finalize(() => {
+      this.desactivando = false;
+      this.cdr.markForCheck();
+    }))
       .subscribe({
         next: (respuesta) => {
+          this.cdr.markForCheck();
           if (!respuesta.success) {
             this.errorFormulario = respuesta.message || 'No fue posible desactivar.';
             return;
@@ -455,6 +474,7 @@ export class UsuariosPage {
         },
         error: (error: HttpErrorResponse) => {
           this.errorFormulario = this.mensajeDeError(error);
+          this.cdr.markForCheck();
         },
       });
   }
