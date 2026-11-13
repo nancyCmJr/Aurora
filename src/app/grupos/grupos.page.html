@@ -1,13 +1,940 @@
+
 <ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title>grupos</ion-title>
+
+  <ion-toolbar color="primary">
+
+    <ion-buttons slot="start">
+
+      <ion-back-button
+        *ngIf="vista === 'lista'"
+        defaultHref="/home">
+      </ion-back-button>
+
+      <ion-button
+        *ngIf="vista !== 'lista'"
+        (click)="regresar()"
+        aria-label="Regresar">
+
+        <ion-icon
+          slot="icon-only"
+          name="arrow-back-outline">
+        </ion-icon>
+
+      </ion-button>
+
+    </ion-buttons>
+
+    <ion-title>
+
+      {{
+        vista === 'lista'
+          ? 'Grupos'
+          : vista === 'detalle'
+          ? 'Detalle del grupo'
+          : editando
+          ? 'Editar grupo'
+          : 'Nuevo grupo'
+      }}
+
+    </ion-title>
+
+    <ion-buttons
+      slot="end"
+      *ngIf="vista === 'lista' && esAdmin">
+
+      <ion-button
+        (click)="nuevo()"
+        aria-label="Registrar grupo">
+
+        <ion-icon
+          slot="icon-only"
+          name="add-outline">
+        </ion-icon>
+
+      </ion-button>
+
+    </ion-buttons>
+
   </ion-toolbar>
+
 </ion-header>
 
+
 <ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">grupos</ion-title>
-    </ion-toolbar>
-  </ion-header>
+
+  <!-- ================================= -->
+  <!-- LISTADO DE GRUPOS -->
+  <!-- ================================= -->
+
+  <ng-container *ngIf="vista === 'lista'">
+
+    <ion-refresher
+      slot="fixed"
+      (ionRefresh)="refrescar($event)">
+
+      <ion-refresher-content>
+      </ion-refresher-content>
+
+    </ion-refresher>
+
+    <div class="ion-padding">
+
+      <h2>Grupos registrados</h2>
+
+      <p>
+        Consulta los grupos, sus docentes,
+        materias y disponibilidad.
+      </p>
+
+      <!-- BUSCADOR -->
+
+      <ion-searchbar
+        name="busqueda"
+        [(ngModel)]="busqueda"
+        [debounce]="200"
+        placeholder="Buscar grupo, materia o docente">
+      </ion-searchbar>
+
+      <!-- FILTRO -->
+
+      <ion-item>
+
+        <ion-select
+          name="filtroEstado"
+          label="Filtrar por estado"
+          labelPlacement="stacked"
+          interface="action-sheet"
+          [(ngModel)]="filtroEstado">
+
+          <ion-select-option value="Todos">
+            Todos
+          </ion-select-option>
+
+          <ion-select-option value="Planeado">
+            Planeados
+          </ion-select-option>
+
+          <ion-select-option value="Abierto">
+            Abiertos
+          </ion-select-option>
+
+          <ion-select-option value="Cerrado">
+            Cerrados
+          </ion-select-option>
+
+          <ion-select-option value="Cancelado">
+            Cancelados
+          </ion-select-option>
+
+        </ion-select>
+
+      </ion-item>
+
+      <ion-note
+        *ngIf="!cargando && !errorLista">
+
+        {{ gruposFiltrados.length }}
+        grupo(s) encontrado(s)
+
+      </ion-note>
+
+    </div>
+
+
+    <!-- CARGANDO -->
+
+    <div
+      *ngIf="cargando || cargandoDetalle"
+      class="ion-padding ion-text-center">
+
+      <ion-spinner name="crescent">
+      </ion-spinner>
+
+      <p>
+        {{
+          cargandoDetalle
+            ? 'Consultando grupo...'
+            : 'Cargando grupos...'
+        }}
+      </p>
+
+    </div>
+
+
+    <!-- ERROR DEL LISTADO -->
+
+    <ion-text
+      color="danger"
+      *ngIf="errorLista">
+
+      <p
+        role="alert"
+        class="ion-padding">
+
+        {{ errorLista }}
+
+      </p>
+
+    </ion-text>
+
+    <ion-button
+      *ngIf="errorLista && !cargando"
+      expand="block"
+      fill="outline"
+      (click)="cargarGrupos()">
+
+      Reintentar
+
+    </ion-button>
+
+
+    <!-- ERROR DEL DETALLE -->
+
+    <ion-text
+      color="danger"
+      *ngIf="errorDetalle">
+
+      <p
+        role="alert"
+        class="ion-padding">
+
+        {{ errorDetalle }}
+
+      </p>
+
+    </ion-text>
+
+
+    <!-- LISTA -->
+
+    <ion-list
+      [inset]="true"
+      *ngIf="!cargando && !errorLista">
+
+      <ion-item
+        *ngFor="let grupo of gruposFiltrados"
+        button
+        detail="true"
+        [disabled]="cargandoDetalle"
+        (click)="abrirDetalle(grupo)">
+
+        <ion-icon
+          slot="start"
+          name="people-outline"
+          color="primary">
+        </ion-icon>
+
+        <ion-label>
+
+          <h2>
+            {{ grupo.clave_grupo }}
+          </h2>
+
+          <p>
+            {{ nombreMateria(grupo) }}
+          </p>
+
+          <p>
+            Semestre {{ grupo.semestre }}
+            ·
+            {{
+              grupo.modalidad === 'Sabado'
+                ? 'Sábado'
+                : grupo.modalidad
+            }}
+          </p>
+
+          <p>
+            Docente:
+            {{ nombreDocente(grupo) }}
+          </p>
+
+          <p>
+            Capacidad:
+            {{ grupo.capacidad }}
+          </p>
+
+          <p
+            *ngIf="lugaresDisponibles(grupo) !== null">
+
+            Disponibles:
+            {{ lugaresDisponibles(grupo) }}
+
+          </p>
+
+          <ion-badge
+            [color]="colorEstado(grupo.estado)">
+
+            {{ grupo.estado }}
+
+          </ion-badge>
+
+        </ion-label>
+
+      </ion-item>
+
+    </ion-list>
+
+
+    <!-- SIN RESULTADOS -->
+
+    <div
+      class="ion-padding ion-text-center"
+      *ngIf="
+        !cargando &&
+        !errorLista &&
+        gruposFiltrados.length === 0
+      ">
+
+      <p>
+        No se encontraron grupos.
+      </p>
+
+      <ion-button
+        *ngIf="esAdmin"
+        fill="outline"
+        (click)="nuevo()">
+
+        Registrar grupo
+
+      </ion-button>
+
+    </div>
+
+  </ng-container>
+
+
+  <!-- ================================= -->
+  <!-- DETALLE DE GRUPO -->
+  <!-- ================================= -->
+
+  <ng-container
+    *ngIf="vista === 'detalle' && seleccionado as grupo">
+
+    <div class="ion-padding">
+
+      <h2>
+        Grupo {{ grupo.clave_grupo }}
+      </h2>
+
+      <ion-badge
+        [color]="colorEstado(grupo.estado)">
+
+        {{ grupo.estado }}
+
+      </ion-badge>
+
+
+      <!-- INFORMACIÓN GENERAL -->
+
+      <h3>Información general</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+          <ion-label>
+            <h3>Identificador</h3>
+            <p>{{ grupo.id_grupo }}</p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Clave</h3>
+            <p>{{ grupo.clave_grupo }}</p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Semestre</h3>
+            <p>{{ grupo.semestre }}</p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Capacidad</h3>
+            <p>{{ grupo.capacidad }} alumnos</p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Modalidad</h3>
+            <p>
+              {{
+                grupo.modalidad === 'Sabado'
+                  ? 'Sábado'
+                  : grupo.modalidad
+              }}
+            </p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Estado</h3>
+            <p>{{ grupo.estado }}</p>
+          </ion-label>
+        </ion-item>
+
+      </ion-list>
+
+
+      <!-- MATERIA -->
+
+      <h3>Materia asignada</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+
+          <ion-icon
+            slot="start"
+            name="book-outline"
+            color="primary">
+          </ion-icon>
+
+          <ion-label>
+
+            <h2>
+              {{ nombreMateria(grupo) }}
+            </h2>
+
+            <p>
+              {{
+                grupo.clave_materia ||
+                'ID ' + grupo.id_materia
+              }}
+            </p>
+
+            <p
+              *ngIf="grupo.creditos_materia != null">
+
+              Créditos:
+              {{ grupo.creditos_materia }}
+
+            </p>
+
+            <p *ngIf="grupo.estado_materia">
+              Estado: {{ grupo.estado_materia }}
+            </p>
+
+          </ion-label>
+
+        </ion-item>
+
+      </ion-list>
+
+
+      <!-- DOCENTE -->
+
+      <h3>Docente asignado</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+
+          <ion-icon
+            name="person-outline"
+            slot="start"
+            color="primary">
+          </ion-icon>
+
+          <ion-label>
+
+            <h2>
+              {{ nombreDocente(grupo) }}
+            </h2>
+
+            <p>
+              {{
+                grupo.codigo_docente ||
+                'ID ' + grupo.id_docente
+              }}
+            </p>
+
+            <p *ngIf="grupo.titulo_academico">
+              {{ grupo.titulo_academico }}
+            </p>
+
+            <p *ngIf="grupo.estado_docente">
+              Estado: {{ grupo.estado_docente }}
+            </p>
+
+          </ion-label>
+
+        </ion-item>
+
+      </ion-list>
+
+
+      <!-- DISPONIBILIDAD -->
+
+      <h3>Disponibilidad</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+          <ion-label>
+            <h3>Capacidad total</h3>
+            <p>{{ grupo.capacidad }}</p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item
+          *ngIf="grupo.alumnos_cursando != null">
+
+          <ion-label>
+            <h3>Alumnos cursando</h3>
+            <p>{{ grupo.alumnos_cursando }}</p>
+          </ion-label>
+
+        </ion-item>
+
+        <ion-item
+          *ngIf="lugaresDisponibles(grupo) !== null">
+
+          <ion-label>
+            <h3>Lugares disponibles</h3>
+            <p>{{ lugaresDisponibles(grupo) }}</p>
+          </ion-label>
+
+        </ion-item>
+
+        <ion-item
+          *ngIf="grupo.total_horarios != null">
+
+          <ion-label>
+            <h3>Horarios registrados</h3>
+            <p>{{ grupo.total_horarios }}</p>
+          </ion-label>
+
+        </ion-item>
+
+      </ion-list>
+
+
+      <!-- ADVERTENCIA POR DEPENDENCIAS -->
+
+      <ion-note
+        *ngIf="
+          (grupo.total_horarios || 0) > 0 ||
+          (grupo.alumnos_cursando || 0) > 0
+        ">
+
+        Este grupo tiene horarios o alumnos cursando.
+        Las modificaciones están sujetas a las
+        restricciones académicas del sistema.
+
+      </ion-note>
+
+
+      <!-- GRUPO CANCELADO -->
+
+      <ion-note
+        *ngIf="grupo.estado === 'Cancelado'">
+
+        Este grupo está cancelado.
+        Su información se conserva para
+        consulta y no puede reactivarse.
+
+      </ion-note>
+
+
+      <!-- ACCIONES -->
+
+      <ng-container
+        *ngIf="esAdmin && grupo.estado !== 'Cancelado'">
+
+        <ion-button
+          expand="block"
+          (click)="editar()">
+
+          <ion-icon
+            slot="start"
+            name="create-outline">
+          </ion-icon>
+
+          Editar grupo
+
+        </ion-button>
+
+        <ion-button
+          expand="block"
+          fill="outline"
+          color="danger"
+          [disabled]="
+            cancelando ||
+            (grupo.alumnos_cursando || 0) > 0
+          "
+          (click)="confirmarCancelacion()">
+
+          <ion-icon
+            slot="start"
+            name="ban-outline">
+          </ion-icon>
+
+          Cancelar grupo
+
+        </ion-button>
+
+        <ion-note
+          *ngIf="(grupo.alumnos_cursando || 0) > 0">
+
+          No se puede cancelar un grupo mientras
+          tenga alumnos cursando.
+
+        </ion-note>
+
+      </ng-container>
+
+    </div>
+
+  </ng-container>
+
+
+  <!-- ================================= -->
+  <!-- FORMULARIO -->
+  <!-- ================================= -->
+
+  <ng-container
+    *ngIf="vista === 'formulario' && esAdmin">
+
+    <div class="ion-padding">
+
+      <h2>
+        {{
+          editando
+            ? 'Modificar grupo'
+            : 'Registrar grupo'
+        }}
+      </h2>
+
+      <p>
+        {{
+          editando
+            ? 'Actualiza los datos del grupo.'
+            : 'Completa los campos para crear un nuevo grupo.'
+        }}
+      </p>
+
+
+      <!-- ADVERTENCIA EN EDICIÓN -->
+
+      <ion-note
+        *ngIf="editando && grupoConDependencias">
+
+        Este grupo tiene registros relacionados.
+        Solamente podrás cambiar el docente.
+        El servidor verificará que el cambio
+        no cause empalmes de horarios.
+
+      </ion-note>
+
+
+      <h3>Datos generales</h3>
+
+      <ion-list [inset]="true">
+
+        <!-- CLAVE DEL GRUPO -->
+
+        <ion-item>
+
+          <ion-input
+            name="clave_grupo"
+            label="Clave del grupo *"
+            labelPlacement="stacked"
+            [(ngModel)]="formulario.clave_grupo"
+            [maxlength]="20"
+            [readonly]="grupoConDependencias"
+            placeholder="Ej. TIC-3A">
+          </ion-input>
+
+        </ion-item>
+
+
+        <!-- CAPACIDAD -->
+
+        <ion-item>
+
+          <ion-input
+            name="capacidad"
+            label="Capacidad máxima *"
+            labelPlacement="stacked"
+            type="number"
+            inputmode="numeric"
+            min="1"
+            step="1"
+            [(ngModel)]="formulario.capacidad"
+            [readonly]="grupoConDependencias">
+          </ion-input>
+
+        </ion-item>
+
+
+        <!-- SEMESTRE -->
+
+        <ion-item>
+
+          <ion-select
+            name="semestre"
+            label="Semestre *"
+            labelPlacement="stacked"
+            interface="action-sheet"
+            [(ngModel)]="formulario.semestre"
+            [disabled]="grupoConDependencias">
+
+            <ion-select-option
+              *ngFor="let semestre of semestres"
+              [value]="semestre">
+
+              Semestre {{ semestre }}
+
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+
+        <!-- MODALIDAD -->
+
+        <ion-item>
+
+          <ion-select
+            name="modalidad"
+            label="Modalidad *"
+            labelPlacement="stacked"
+            interface="action-sheet"
+            [(ngModel)]="formulario.modalidad"
+            [disabled]="grupoConDependencias">
+
+            <ion-select-option value="Entre semana">
+              Entre semana
+            </ion-select-option>
+
+            <ion-select-option value="Sabado">
+              Sábado
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+      </ion-list>
+
+
+      <!-- MATERIA -->
+
+      <h3>Materia</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+
+          <ion-select
+            name="id_materia"
+            label="Materia asignada *"
+            labelPlacement="stacked"
+            interface="alert"
+            [(ngModel)]="formulario.id_materia"
+            [disabled]="
+              grupoConDependencias ||
+              cargandoCatalogos
+            ">
+
+            <ion-select-option
+              *ngFor="let materia of materiasDisponibles"
+              [value]="materia.id_materia"
+              [disabled]="materia.estado !== 'Activa'">
+
+              {{ materia.clave_materia }}
+              · {{ materia.nombre }}
+
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+      </ion-list>
+
+
+      <!-- DOCENTE -->
+
+      <h3>Docente</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+
+          <ion-select
+            name="id_docente"
+            label="Docente asignado *"
+            labelPlacement="stacked"
+            interface="alert"
+            [(ngModel)]="formulario.id_docente"
+            [disabled]="cargandoCatalogos">
+
+            <ion-select-option
+              *ngFor="let docente of docentesDisponibles"
+              [value]="docente.id_docente"
+              [disabled]="docente.estado !== 'Activo'">
+
+              {{ docente.codigo }}
+              · {{ nombreDocenteCatalogo(docente) }}
+
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+      </ion-list>
+
+
+      <!-- ESTADO -->
+
+      <h3>Estado del grupo</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+
+          <ion-select
+            name="estado"
+            label="Estado *"
+            labelPlacement="stacked"
+            interface="action-sheet"
+            [(ngModel)]="formulario.estado"
+            [disabled]="grupoConDependencias">
+
+            <ion-select-option
+              *ngFor="let estado of estadosPermitidos"
+              [value]="estado">
+
+              {{ estado }}
+
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+      </ion-list>
+
+      <ion-note>
+        Para cancelar un grupo existente,
+        utiliza la opción «Cancelar grupo»
+        desde su detalle.
+      </ion-note>
+
+
+      <!-- CARGANDO CATÁLOGOS -->
+
+      <div
+        *ngIf="cargandoCatalogos"
+        class="ion-padding ion-text-center">
+
+        <ion-spinner name="crescent">
+        </ion-spinner>
+
+        <p>
+          Cargando materias y docentes...
+        </p>
+
+      </div>
+
+
+      <!-- ERRORES DE CATÁLOGOS -->
+
+      <ion-text
+        color="danger"
+        *ngIf="errorCatalogos">
+
+        <p role="alert">
+          {{ errorCatalogos }}
+        </p>
+
+      </ion-text>
+
+      <ion-button
+        *ngIf="errorCatalogos"
+        fill="clear"
+        (click)="cargarCatalogos()">
+
+        Reintentar cargar catálogos
+
+      </ion-button>
+
+
+      <!-- ERROR DEL FORMULARIO -->
+
+      <ion-text
+        color="danger"
+        *ngIf="errorFormulario">
+
+        <p role="alert">
+          {{ errorFormulario }}
+        </p>
+
+      </ion-text>
+
+      <ion-note>
+        Los campos marcados con * son obligatorios.
+      </ion-note>
+
+
+      <!-- GUARDAR -->
+
+      <ion-button
+        expand="block"
+        (click)="guardar()"
+        [disabled]="
+          guardando ||
+          cargandoCatalogos ||
+          !catalogosListos
+        ">
+
+        <ion-spinner
+          *ngIf="guardando"
+          slot="start"
+          name="crescent">
+        </ion-spinner>
+
+        <ion-icon
+          *ngIf="!guardando"
+          slot="start"
+          name="save-outline">
+        </ion-icon>
+
+        {{
+          guardando
+            ? 'Guardando...'
+            : editando
+            ? 'Guardar cambios'
+            : 'Registrar grupo'
+        }}
+
+      </ion-button>
+
+
+      <!-- CANCELAR FORMULARIO -->
+
+      <ion-button
+        expand="block"
+        fill="clear"
+        [disabled]="guardando"
+        (click)="regresar()">
+
+        Volver
+
+      </ion-button>
+
+    </div>
+
+  </ng-container>
+
 </ion-content>
