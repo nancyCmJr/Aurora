@@ -1,13 +1,307 @@
 <ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title>usuarios</ion-title>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-back-button
+        *ngIf="vista === 'lista'"
+        defaultHref="/home"
+        text="">
+      </ion-back-button>
+      <ion-button
+        *ngIf="vista === 'formulario'"
+        (click)="regresarLista()"
+        [disabled]="guardando || desactivando"
+        aria-label="Volver a usuarios">
+        <ion-icon slot="icon-only" name="arrow-back-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+
+    <ion-title>
+      {{ vista === 'lista' ? 'Usuarios' : (editando ? 'Editar usuario' : 'Nuevo usuario') }}
+    </ion-title>
+
+    <ion-buttons slot="end" *ngIf="vista === 'lista'">
+      <ion-button (click)="nuevoUsuario()" aria-label="Registrar nuevo usuario">
+        <ion-icon slot="start" name="add-outline"></ion-icon>
+        Nuevo
+      </ion-button>
+    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
 <ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">usuarios</ion-title>
-    </ion-toolbar>
-  </ion-header>
+  <!-- LISTADO -->
+  <ng-container *ngIf="vista === 'lista'">
+    <ion-refresher slot="fixed" (ionRefresh)="refrescar($event)">
+      <ion-refresher-content></ion-refresher-content>
+    </ion-refresher>
+
+    <div class="ion-padding-horizontal ion-padding-top">
+      <h2>Cuentas del sistema</h2>
+      <p>Busca un usuario o selecciona uno para consultar y editar sus datos.</p>
+    </div>
+
+    <ion-searchbar
+      [(ngModel)]="busqueda"
+      placeholder="Nombre, código o correo"
+      [debounce]="200"
+      inputmode="search"
+      showClearButton="focus">
+    </ion-searchbar>
+
+    <ion-segment [(ngModel)]="filtroEstado" [scrollable]="true">
+      <ion-segment-button value="Todos"><ion-label>Todos</ion-label></ion-segment-button>
+      <ion-segment-button value="Activo"><ion-label>Activos</ion-label></ion-segment-button>
+      <ion-segment-button value="Inactivo"><ion-label>Inactivos</ion-label></ion-segment-button>
+      <ion-segment-button value="Bloqueado"><ion-label>Bloqueados</ion-label></ion-segment-button>
+    </ion-segment>
+
+    <div class="ion-padding-horizontal ion-padding-top">
+      <ion-note>{{ usuariosFiltrados.length }} cuentas encontradas</ion-note>
+    </div>
+
+    <div *ngIf="cargando || cargandoDetalle" class="ion-text-center ion-padding">
+      <ion-spinner name="crescent"></ion-spinner>
+      <p>{{ cargandoDetalle ? 'Consultando usuario...' : 'Cargando usuarios...' }}</p>
+    </div>
+
+    <ion-text color="danger" *ngIf="errorListado">
+      <p class="ion-padding" role="alert">{{ errorListado }}</p>
+    </ion-text>
+    <div *ngIf="errorListado" class="ion-padding-horizontal">
+      <ion-button fill="outline" expand="block" (click)="cargarUsuarios()">Reintentar</ion-button>
+    </div>
+
+    <ion-list [inset]="true" *ngIf="!cargando && usuariosFiltrados.length > 0">
+      <ion-list-header>
+        <ion-label>Usuarios registrados</ion-label>
+      </ion-list-header>
+
+      <ion-item
+        *ngFor="let usuario of usuariosFiltrados"
+        button
+        [detail]="true"
+        [disabled]="cargandoDetalle"
+        (click)="abrirUsuario(usuario)">
+        <ion-icon
+          slot="start"
+          name="person-circle-outline"
+          color="primary"
+          aria-hidden="true">
+        </ion-icon>
+
+        <ion-label>
+          <h2>{{ usuario.nombre_usuario }}</h2>
+          <p>{{ usuario.correo }}</p>
+          <p>{{ usuario.codigo }} · {{ usuario.rol }}</p>
+          <ion-badge
+            [color]="usuario.estado === 'Activo' ? 'success' :
+              (usuario.estado === 'Bloqueado' ? 'danger' : 'medium')">
+            {{ usuario.estado }}
+          </ion-badge>
+        </ion-label>
+      </ion-item>
+    </ion-list>
+
+    <div
+      *ngIf="!cargando && !errorListado && usuariosFiltrados.length === 0"
+      class="ion-text-center ion-padding">
+      <ion-icon name="people-outline" size="large" color="medium"></ion-icon>
+      <h3>No hay usuarios para mostrar</h3>
+      <p>Prueba otros filtros o registra una nueva cuenta.</p>
+      <ion-button (click)="nuevoUsuario()" fill="outline">Registrar usuario</ion-button>
+    </div>
+  </ng-container>
+
+  <!-- ALTA Y EDICIÓN EN LA MISMA PÁGINA PARA USO MÓVIL -->
+  <ng-container *ngIf="vista === 'formulario'">
+    <div class="ion-padding-horizontal ion-padding-top">
+      <h2>{{ editando ? 'Datos de la cuenta' : 'Registrar cuenta' }}</h2>
+      <p>
+        {{ editando ? 'Modifica los datos necesarios y guarda los cambios.' :
+          'Completa la información para crear un nuevo acceso a Aurora.' }}
+      </p>
+    </div>
+
+    <form (ngSubmit)="guardar()" novalidate>
+      <ion-list [inset]="true">
+        <ion-list-header>
+          <ion-label>Datos de acceso</ion-label>
+        </ion-list-header>
+
+        <ion-item>
+          <ion-input
+            name="codigo"
+            label="Código de usuario"
+            labelPlacement="stacked"
+            placeholder="Ej. USR001"
+            maxlength="30"
+            autocapitalize="characters"
+            [readonly]="editando"
+            [disabled]="guardando"
+            [(ngModel)]="formulario.codigo"
+            required>
+          </ion-input>
+        </ion-item>
+
+        <ion-item>
+          <ion-input
+            name="nombre_usuario"
+            label="Nombre de usuario"
+            labelPlacement="stacked"
+            placeholder="Ej. maria.lopez"
+            maxlength="50"
+            autocapitalize="off"
+            [disabled]="guardando"
+            [(ngModel)]="formulario.nombre_usuario"
+            required>
+          </ion-input>
+        </ion-item>
+
+        <ion-item>
+          <ion-input
+            name="correo"
+            label="Correo electrónico"
+            labelPlacement="stacked"
+            placeholder="usuario@institucion.edu.mx"
+            type="email"
+            inputmode="email"
+            autocomplete="off"
+            maxlength="100"
+            [disabled]="guardando"
+            [(ngModel)]="formulario.correo"
+            required>
+          </ion-input>
+        </ion-item>
+
+        <ion-item>
+          <ion-input
+            name="password"
+            label="{{ editando ? 'Nueva contraseña (opcional)' : 'Contraseña' }}"
+            labelPlacement="stacked"
+            type="password"
+            autocomplete="new-password"
+            [disabled]="guardando"
+            [(ngModel)]="formulario.password"
+            [required]="!editando">
+            <ion-input-password-toggle slot="end"></ion-input-password-toggle>
+          </ion-input>
+        </ion-item>
+      </ion-list>
+
+      <div class="ion-padding-horizontal" *ngIf="editando">
+        <ion-note>Deja la contraseña vacía para conservar la actual.</ion-note>
+      </div>
+
+      <ion-list [inset]="true">
+        <ion-list-header>
+          <ion-label>Rol y vinculación</ion-label>
+        </ion-list-header>
+
+        <ion-item>
+          <ion-select
+            name="rol"
+            label="Rol"
+            labelPlacement="stacked"
+            interface="action-sheet"
+            [(ngModel)]="formulario.rol"
+            (ionChange)="cambiarRol()"
+            [disabled]="guardando || esUsuarioActual">
+            <ion-select-option value="Admin">Administrador</ion-select-option>
+            <ion-select-option value="Docente">Docente</ion-select-option>
+            <ion-select-option value="Alumno">Alumno</ion-select-option>
+          </ion-select>
+        </ion-item>
+
+        <ion-item *ngIf="formulario.rol === 'Alumno'">
+          <ion-input
+            name="numero_control"
+            label="Número de control del alumno"
+            labelPlacement="stacked"
+            placeholder="Número de control existente"
+            maxlength="20"
+            [disabled]="guardando"
+            [(ngModel)]="formulario.numero_control"
+            required>
+          </ion-input>
+        </ion-item>
+
+        <ion-item *ngIf="formulario.rol === 'Docente'">
+          <ion-input
+            name="id_docente"
+            label="ID del docente"
+            labelPlacement="stacked"
+            placeholder="ID numérico existente"
+            type="text"
+            inputmode="numeric"
+            [disabled]="guardando"
+            [(ngModel)]="formulario.id_docente"
+            required>
+          </ion-input>
+        </ion-item>
+
+        <ion-item *ngIf="editando">
+          <ion-select
+            name="estado"
+            label="Estado de la cuenta"
+            labelPlacement="stacked"
+            interface="action-sheet"
+            [(ngModel)]="formulario.estado"
+            [disabled]="guardando || esUsuarioActual">
+            <ion-select-option value="Activo">Activo</ion-select-option>
+            <ion-select-option value="Inactivo">Inactivo</ion-select-option>
+            <ion-select-option value="Bloqueado">Bloqueado</ion-select-option>
+          </ion-select>
+        </ion-item>
+      </ion-list>
+
+      <div class="ion-padding-horizontal">
+        <ion-note *ngIf="formulario.rol === 'Alumno'">
+          El alumno debe estar registrado y no puede estar asociado a otra cuenta.
+        </ion-note>
+        <ion-note *ngIf="formulario.rol === 'Docente'">
+          El docente debe estar registrado y no puede estar asociado a otra cuenta.
+        </ion-note>
+        <ion-note *ngIf="formulario.rol === 'Admin'">
+          Los administradores no requieren un vínculo con alumno o docente.
+        </ion-note>
+      </div>
+
+      <ion-text color="danger" *ngIf="errorFormulario">
+        <p class="ion-padding" role="alert">{{ errorFormulario }}</p>
+      </ion-text>
+
+      <div class="ion-padding">
+        <ion-button type="submit" expand="block" [disabled]="guardando || desactivando">
+          <ion-spinner *ngIf="guardando" slot="start" name="crescent"></ion-spinner>
+          <ion-icon *ngIf="!guardando" slot="start" name="save-outline"></ion-icon>
+          {{ guardando ? 'Guardando...' : (editando ? 'Guardar cambios' : 'Registrar usuario') }}
+        </ion-button>
+
+        <ion-button
+          type="button"
+          expand="block"
+          fill="outline"
+          color="medium"
+          [disabled]="guardando || desactivando"
+          (click)="regresarLista()">
+          Cancelar
+        </ion-button>
+
+        <ion-button
+          *ngIf="editando && formulario.estado !== 'Inactivo'"
+          type="button"
+          expand="block"
+          color="danger"
+          fill="clear"
+          [disabled]="guardando || desactivando || esUsuarioActual"
+          (click)="confirmarDesactivar()">
+          <ion-icon name="trash-outline" slot="start"></ion-icon>
+          {{ desactivando ? 'Desactivando...' : 'Desactivar usuario' }}
+        </ion-button>
+        <ion-note *ngIf="esUsuarioActual" color="medium">
+          No puedes desactivar tu propia cuenta desde esta pantalla.
+        </ion-note>
+      </div>
+    </form>
+  </ng-container>
 </ion-content>
