@@ -1,13 +1,1120 @@
+
 <ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title>salones</ion-title>
+
+  <ion-toolbar color="primary">
+
+    <ion-buttons slot="start">
+
+      <ion-button
+        (click)="volver()"
+        aria-label="Regresar">
+
+        <ion-icon
+          slot="icon-only"
+          name="arrow-back-outline">
+        </ion-icon>
+
+      </ion-button>
+
+    </ion-buttons>
+
+    <ion-title>
+      {{
+        vista === 'lista'
+          ? 'Salones'
+          : vista === 'detalle'
+          ? 'Detalle del salón'
+          : editando
+          ? 'Editar salón'
+          : 'Nuevo salón'
+      }}
+    </ion-title>
+
+    <ion-buttons
+      slot="end"
+      *ngIf="vista === 'lista'">
+
+      <ion-button
+        (click)="cargarDatos()"
+        [disabled]="
+          cargando ||
+          cargandoEdificios ||
+          cargandoAreas
+        "
+        aria-label="Actualizar">
+
+        <ion-icon
+          slot="icon-only"
+          name="refresh-outline">
+        </ion-icon>
+
+      </ion-button>
+
+      <ion-button
+        *ngIf="esAdmin"
+        (click)="nuevoSalon()"
+        aria-label="Registrar salón">
+
+        <ion-icon
+          slot="icon-only"
+          name="add-outline">
+        </ion-icon>
+
+      </ion-button>
+
+    </ion-buttons>
+
   </ion-toolbar>
+
 </ion-header>
 
+
 <ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">salones</ion-title>
-    </ion-toolbar>
-  </ion-header>
+
+  <!-- ================================= -->
+  <!-- LISTADO DE SALONES -->
+  <!-- ================================= -->
+
+  <ng-container *ngIf="vista === 'lista'">
+
+    <div class="ion-padding">
+
+      <h2>Administración de salones</h2>
+
+      <p>
+        Gestiona las aulas, laboratorios,
+        talleres y auditorios de la institución.
+      </p>
+
+      <!-- RESUMEN -->
+
+      <ion-card>
+
+        <ion-card-header>
+
+          <ion-card-title>
+            Resumen de espacios
+          </ion-card-title>
+
+        </ion-card-header>
+
+        <ion-card-content>
+
+          <p>
+            <strong>Total de salones:</strong>
+            {{ totalSalones }}
+          </p>
+
+          <p>
+            <strong>Activos:</strong>
+            {{ totalActivos }}
+          </p>
+
+          <p>
+            <strong>Inactivos:</strong>
+            {{ totalInactivos }}
+          </p>
+
+          <p>
+            <strong>Capacidad activa total:</strong>
+            {{ capacidadTotal }} lugares
+          </p>
+
+        </ion-card-content>
+
+      </ion-card>
+
+      <!-- BUSCADOR -->
+
+      <ion-searchbar
+        name="busqueda"
+        [(ngModel)]="busqueda"
+        [debounce]="200"
+        placeholder="Buscar salón, edificio o área">
+      </ion-searchbar>
+
+      <!-- FILTRO POR TIPO -->
+
+      <ion-item>
+
+        <ion-select
+          name="filtroTipo"
+          label="Tipo de espacio"
+          labelPlacement="stacked"
+          interface="action-sheet"
+          [(ngModel)]="filtroTipo">
+
+          <ion-select-option value="Todos">
+            Todos
+          </ion-select-option>
+
+          <ion-select-option
+            *ngFor="let tipo of tipos"
+            [value]="tipo">
+
+            {{ tipo }}
+
+          </ion-select-option>
+
+        </ion-select>
+
+      </ion-item>
+
+      <!-- FILTRO POR ESTADO -->
+
+      <ion-item>
+
+        <ion-select
+          name="filtroEstado"
+          label="Estado"
+          labelPlacement="stacked"
+          interface="action-sheet"
+          [(ngModel)]="filtroEstado">
+
+          <ion-select-option value="Todos">
+            Todos
+          </ion-select-option>
+
+          <ion-select-option value="Activo">
+            Activos
+          </ion-select-option>
+
+          <ion-select-option value="Inactivo">
+            Inactivos
+          </ion-select-option>
+
+        </ion-select>
+
+      </ion-item>
+
+      <ion-note
+        *ngIf="!cargando && !errorLista">
+
+        {{ salonesFiltrados.length }}
+        salón(es) encontrado(s)
+
+      </ion-note>
+
+    </div>
+
+    <!-- CARGANDO -->
+
+    <div
+      *ngIf="cargando"
+      class="ion-padding ion-text-center">
+
+      <ion-spinner name="crescent">
+      </ion-spinner>
+
+      <p>
+        Cargando salones...
+      </p>
+
+    </div>
+
+    <!-- ERROR DE LISTADO -->
+
+    <div
+      *ngIf="errorLista && !cargando"
+      class="ion-padding">
+
+      <ion-note color="danger">
+        {{ errorLista }}
+      </ion-note>
+
+      <ion-button
+        expand="block"
+        fill="outline"
+        (click)="cargarSalones()">
+
+        Reintentar
+
+      </ion-button>
+
+    </div>
+
+    <!-- LISTADO -->
+
+    <ion-list
+      [inset]="true"
+      *ngIf="!cargando && !errorLista">
+
+      <ion-item
+        *ngFor="
+          let salon of salonesFiltrados;
+          trackBy: trackById
+        "
+        button
+        detail="true"
+        [disabled]="cargandoDetalle"
+        (click)="verDetalle(salon)">
+
+        <ion-icon
+          slot="start"
+          name="school-outline"
+          color="primary">
+        </ion-icon>
+
+        <ion-label>
+
+          <h2>
+            {{ salon.nombre }}
+          </h2>
+
+          <p>
+            {{ salon.tipo }}
+          </p>
+
+          <p>
+            Edificio:
+            {{ nombreEdificio(salon) }}
+          </p>
+
+          <p>
+            Área:
+            {{ nombreArea(salon) }}
+          </p>
+
+          <p>
+            Capacidad:
+            {{ salon.capacidad }} personas
+          </p>
+
+          <ion-badge
+            [color]="colorEstado(salon.estado)">
+
+            {{ salon.estado }}
+
+          </ion-badge>
+
+        </ion-label>
+
+      </ion-item>
+
+    </ion-list>
+
+    <!-- SIN RESULTADOS -->
+
+    <div
+      class="ion-padding ion-text-center"
+      *ngIf="
+        !cargando &&
+        !errorLista &&
+        salonesFiltrados.length === 0
+      ">
+
+      <ion-icon
+        name="school-outline"
+        size="large"
+        color="medium">
+      </ion-icon>
+
+      <h3>No se encontraron salones</h3>
+
+      <p>
+        No existen salones que coincidan
+        con los criterios seleccionados.
+      </p>
+
+      <ion-button
+        *ngIf="esAdmin"
+        fill="outline"
+        (click)="nuevoSalon()">
+
+        <ion-icon
+          slot="start"
+          name="add-outline">
+        </ion-icon>
+
+        Registrar salón
+
+      </ion-button>
+
+    </div>
+
+  </ng-container>
+
+
+  <!-- ================================= -->
+  <!-- DETALLE DEL SALÓN -->
+  <!-- ================================= -->
+
+  <ng-container
+    *ngIf="
+      vista === 'detalle' &&
+      seleccionado as salon
+    ">
+
+    <div class="ion-padding">
+
+      <h2>
+        {{ salon.nombre }}
+      </h2>
+
+      <ion-badge
+        [color]="colorEstado(salon.estado)">
+
+        {{ salon.estado }}
+
+      </ion-badge>
+
+      <!-- CARGANDO DETALLE -->
+
+      <div
+        *ngIf="cargandoDetalle"
+        class="ion-padding ion-text-center">
+
+        <ion-spinner name="crescent">
+        </ion-spinner>
+
+        <p>
+          Consultando salón...
+        </p>
+
+      </div>
+
+      <!-- ERROR -->
+
+      <ion-note
+        *ngIf="errorDetalle"
+        color="danger">
+
+        {{ errorDetalle }}
+
+      </ion-note>
+
+      <!-- INFORMACIÓN GENERAL -->
+
+      <ion-card>
+
+        <ion-card-header>
+
+          <ion-card-title>
+            Información general
+          </ion-card-title>
+
+        </ion-card-header>
+
+        <ion-card-content>
+
+          <ion-list>
+
+            <!-- ID -->
+
+            <ion-item>
+
+              <ion-label>
+
+                <h3>Identificador</h3>
+
+                <p>
+                  {{ salon.id_salon }}
+                </p>
+
+              </ion-label>
+
+            </ion-item>
+
+            <!-- NOMBRE -->
+
+            <ion-item>
+
+              <ion-label>
+
+                <h3>Nombre del salón</h3>
+
+                <p>
+                  {{ salon.nombre }}
+                </p>
+
+              </ion-label>
+
+            </ion-item>
+
+            <!-- TIPO -->
+
+            <ion-item>
+
+              <ion-label>
+
+                <h3>Tipo de espacio</h3>
+
+                <p>
+                  {{ salon.tipo }}
+                </p>
+
+              </ion-label>
+
+            </ion-item>
+
+            <!-- CAPACIDAD -->
+
+            <ion-item>
+
+              <ion-icon
+                slot="start"
+                name="people-outline"
+                color="primary">
+              </ion-icon>
+
+              <ion-label>
+
+                <h3>Capacidad máxima</h3>
+
+                <p>
+                  {{ salon.capacidad }} personas
+                </p>
+
+              </ion-label>
+
+            </ion-item>
+
+            <!-- ESTADO -->
+
+            <ion-item>
+
+              <ion-label>
+
+                <h3>Estado</h3>
+
+                <p>
+                  {{ salon.estado }}
+                </p>
+
+              </ion-label>
+
+              <ion-badge
+                slot="end"
+                [color]="colorEstado(salon.estado)">
+
+                {{ salon.estado }}
+
+              </ion-badge>
+
+            </ion-item>
+
+          </ion-list>
+
+        </ion-card-content>
+
+      </ion-card>
+
+      <!-- UBICACIÓN -->
+
+      <ion-card>
+
+        <ion-card-header>
+
+          <ion-card-title>
+            Ubicación institucional
+          </ion-card-title>
+
+        </ion-card-header>
+
+        <ion-card-content>
+
+          <ion-list>
+
+            <!-- EDIFICIO -->
+
+            <ion-item>
+
+              <ion-icon
+                slot="start"
+                name="business-outline"
+                color="primary">
+              </ion-icon>
+
+              <ion-label>
+
+                <h3>Edificio</h3>
+
+                <p>
+                  {{ nombreEdificio(salon) }}
+                </p>
+
+              </ion-label>
+
+            </ion-item>
+
+            <!-- ID EDIFICIO -->
+
+            <ion-item>
+
+              <ion-label>
+
+                <h3>ID del edificio</h3>
+
+                <p>
+                  {{ salon.id_edificio }}
+                </p>
+
+              </ion-label>
+
+            </ion-item>
+
+            <!-- ÁREA -->
+
+            <ion-item>
+
+              <ion-label>
+
+                <h3>Área asignada</h3>
+
+                <p>
+                  {{ nombreArea(salon) }}
+                </p>
+
+              </ion-label>
+
+            </ion-item>
+
+            <!-- ID ÁREA -->
+
+            <ion-item>
+
+              <ion-label>
+
+                <h3>ID del área</h3>
+
+                <p>
+                  {{ salon.id_area }}
+                </p>
+
+              </ion-label>
+
+            </ion-item>
+
+          </ion-list>
+
+        </ion-card-content>
+
+      </ion-card>
+
+      <!-- DEPENDENCIAS -->
+
+      <ion-card
+        *ngIf="salon.total_horarios != null">
+
+        <ion-card-header>
+
+          <ion-card-title>
+            Horarios relacionados
+          </ion-card-title>
+
+        </ion-card-header>
+
+        <ion-card-content>
+
+          <p>
+            <strong>Total de horarios:</strong>
+            {{ salon.total_horarios }}
+          </p>
+
+        </ion-card-content>
+
+      </ion-card>
+
+      <!-- INFORMACIÓN DE ESTADO -->
+
+      <ion-note
+        *ngIf="salon.estado === 'Inactivo'">
+
+        Este salón se encuentra inactivo.
+        Su información permanece disponible
+        para consulta histórica.
+      </ion-note>
+
+      <!-- ACCIONES -->
+
+      <ng-container *ngIf="esAdmin">
+
+        <ion-button
+          expand="block"
+          [disabled]="cargandoDetalle || desactivando"
+          (click)="editarSalon()">
+
+          <ion-icon
+            slot="start"
+            name="create-outline">
+          </ion-icon>
+
+          Editar salón
+
+        </ion-button>
+
+        <ion-button
+          *ngIf="salon.estado === 'Activo'"
+          expand="block"
+          fill="outline"
+          color="danger"
+          [disabled]="cargandoDetalle || desactivando"
+          (click)="confirmarBaja()">
+
+          <ion-icon
+            slot="start"
+            name="ban-outline">
+          </ion-icon>
+
+          Desactivar salón
+
+        </ion-button>
+
+      </ng-container>
+
+    </div>
+
+  </ng-container>
+
+
+  <!-- ================================= -->
+  <!-- FORMULARIO -->
+  <!-- ================================= -->
+
+  <ng-container
+    *ngIf="
+      vista === 'formulario' &&
+      esAdmin
+    ">
+
+    <div class="ion-padding">
+
+      <h2>
+        {{
+          editando
+            ? 'Modificar salón'
+            : 'Registrar nuevo salón'
+        }}
+      </h2>
+
+      <p>
+        Completa la información del espacio
+        y selecciona su ubicación dentro
+        de la institución.
+      </p>
+
+      <!-- DATOS GENERALES -->
+
+      <ion-card>
+
+        <ion-card-header>
+
+          <ion-card-title>
+            Información del salón
+          </ion-card-title>
+
+        </ion-card-header>
+
+        <ion-card-content>
+
+          <ion-list>
+
+            <!-- NOMBRE -->
+
+            <ion-item>
+
+              <ion-input
+                name="nombre"
+                label="Nombre del salón *"
+                labelPlacement="stacked"
+                [(ngModel)]="form.nombre"
+                [maxlength]="50"
+                placeholder="Ej. A-101"
+                [disabled]="guardando">
+              </ion-input>
+
+            </ion-item>
+
+            <!-- TIPO -->
+
+            <ion-item>
+
+              <ion-select
+                name="tipo"
+                label="Tipo de salón *"
+                labelPlacement="stacked"
+                interface="action-sheet"
+                [(ngModel)]="form.tipo"
+                [disabled]="guardando">
+
+                <ion-select-option
+                  *ngFor="let tipo of tipos"
+                  [value]="tipo">
+
+                  {{ tipo }}
+
+                </ion-select-option>
+
+              </ion-select>
+
+            </ion-item>
+
+            <!-- CAPACIDAD -->
+
+            <ion-item>
+
+              <ion-input
+                name="capacidad"
+                label="Capacidad máxima *"
+                labelPlacement="stacked"
+                type="number"
+                inputmode="numeric"
+                min="1"
+                step="1"
+                [(ngModel)]="form.capacidad"
+                placeholder="Ej. 40"
+                [disabled]="guardando">
+              </ion-input>
+
+            </ion-item>
+
+            <!-- ESTADO -->
+
+            <ion-item>
+
+              <ion-select
+                name="estado"
+                label="Estado del salón *"
+                labelPlacement="stacked"
+                interface="action-sheet"
+                [(ngModel)]="form.estado"
+                [disabled]="guardando">
+
+                <ion-select-option value="Activo">
+                  Activo
+                </ion-select-option>
+
+                <ion-select-option value="Inactivo">
+                  Inactivo
+                </ion-select-option>
+
+              </ion-select>
+
+            </ion-item>
+
+          </ion-list>
+
+        </ion-card-content>
+
+      </ion-card>
+
+      <!-- UBICACIÓN -->
+
+      <ion-card>
+
+        <ion-card-header>
+
+          <ion-card-title>
+            Ubicación del salón
+          </ion-card-title>
+
+        </ion-card-header>
+
+        <ion-card-content>
+
+          <ion-list>
+
+            <!-- EDIFICIO -->
+
+            <ion-item>
+
+              <ion-select
+                name="id_edificio"
+                label="Edificio *"
+                labelPlacement="stacked"
+                interface="alert"
+                [(ngModel)]="form.id_edificio"
+                (ionChange)="alCambiarEdificio()"
+                [disabled]="
+                  guardando ||
+                  cargandoEdificios
+                ">
+
+                <ion-select-option
+                  *ngFor="
+                    let edificio of edificiosDisponibles
+                  "
+                  [value]="edificio.id_edificio">
+
+                  {{ edificio.nombre }}
+                  -
+                  {{ edificio.estado }}
+
+                </ion-select-option>
+
+              </ion-select>
+
+            </ion-item>
+
+            <!-- ÁREA -->
+
+            <ion-item>
+
+              <ion-select
+                name="id_area"
+                label="Área *"
+                labelPlacement="stacked"
+                interface="alert"
+                [(ngModel)]="form.id_area"
+                [disabled]="
+                  guardando ||
+                  cargandoAreas ||
+                  !form.id_edificio
+                ">
+
+                <ion-select-option
+                  *ngFor="
+                    let area of areasDisponibles
+                  "
+                  [value]="area.id_area">
+
+                  {{ area.nombre }}
+                  -
+                  {{ area.estado }}
+
+                </ion-select-option>
+
+              </ion-select>
+
+            </ion-item>
+
+          </ion-list>
+
+          <!-- AVISO SI NO HAY EDIFICIO -->
+
+          <ion-note
+            *ngIf="!form.id_edificio">
+
+            Primero selecciona un edificio
+            para mostrar sus áreas disponibles.
+
+          </ion-note>
+
+          <!-- AVISO SIN ÁREAS -->
+
+          <ion-note
+            *ngIf="
+              form.id_edificio &&
+              !cargandoAreas &&
+              areasDisponibles.length === 0
+            "
+            color="warning">
+
+            No hay áreas disponibles
+            en el edificio seleccionado.
+
+          </ion-note>
+
+        </ion-card-content>
+
+      </ion-card>
+
+      <!-- EDIFICIO SELECCIONADO -->
+
+      <ion-card
+        *ngIf="edificioSeleccionado as edificio">
+
+        <ion-card-header>
+
+          <ion-card-title>
+            Edificio seleccionado
+          </ion-card-title>
+
+        </ion-card-header>
+
+        <ion-card-content>
+
+          <p>
+            <strong>Nombre:</strong>
+            {{ edificio.nombre }}
+          </p>
+
+          <p>
+            <strong>Estado:</strong>
+            {{ edificio.estado }}
+          </p>
+
+          <ion-note
+            *ngIf="
+              edificio.estado !== 'Activo' &&
+              form.estado === 'Activo'
+            "
+            color="danger">
+
+            No puedes activar un salón
+            ubicado en un edificio inactivo.
+
+          </ion-note>
+
+        </ion-card-content>
+
+      </ion-card>
+
+      <!-- ÁREA SELECCIONADA -->
+
+      <ion-card
+        *ngIf="areaSeleccionada as area">
+
+        <ion-card-header>
+
+          <ion-card-title>
+            Área seleccionada
+          </ion-card-title>
+
+        </ion-card-header>
+
+        <ion-card-content>
+
+          <p>
+            <strong>Nombre:</strong>
+            {{ area.nombre }}
+          </p>
+
+          <p>
+            <strong>Estado:</strong>
+            {{ area.estado }}
+          </p>
+
+          <ion-note
+            *ngIf="
+              area.estado !== 'Activo' &&
+              form.estado === 'Activo'
+            "
+            color="danger">
+
+            No puedes activar un salón
+            dentro de un área inactiva.
+
+          </ion-note>
+
+        </ion-card-content>
+
+      </ion-card>
+
+      <!-- CARGANDO CATÁLOGOS -->
+
+      <div
+        *ngIf="
+          cargandoEdificios ||
+          cargandoAreas
+        "
+        class="ion-padding ion-text-center">
+
+        <ion-spinner name="crescent">
+        </ion-spinner>
+
+        <p>
+          Cargando edificios y áreas...
+        </p>
+
+      </div>
+
+      <!-- ERROR EDIFICIOS -->
+
+      <div *ngIf="errorEdificios">
+
+        <ion-note color="danger">
+          {{ errorEdificios }}
+        </ion-note>
+
+        <ion-button
+          expand="block"
+          fill="outline"
+          (click)="cargarEdificios()">
+
+          Reintentar cargar edificios
+
+        </ion-button>
+
+      </div>
+
+      <!-- ERROR ÁREAS -->
+
+      <div *ngIf="errorAreas">
+
+        <ion-note color="danger">
+          {{ errorAreas }}
+        </ion-note>
+
+        <ion-button
+          expand="block"
+          fill="outline"
+          (click)="cargarAreas()">
+
+          Reintentar cargar áreas
+
+        </ion-button>
+
+      </div>
+
+      <!-- OBSERVACIONES -->
+
+      <ion-note>
+        Los campos marcados con *
+        son obligatorios.
+      </ion-note>
+
+      <ion-note>
+        La capacidad máxima debe ser
+        un número entero mayor que cero.
+      </ion-note>
+
+      <ion-note>
+        El área debe pertenecer al edificio
+        seleccionado.
+      </ion-note>
+
+      <!-- GUARDAR -->
+
+      <ion-button
+        expand="block"
+        [disabled]="
+          guardando ||
+          cargandoEdificios ||
+          cargandoAreas ||
+          !!errorEdificios ||
+          !!errorAreas ||
+          edificios.length === 0 ||
+          areas.length === 0
+        "
+        (click)="guardarSalon()">
+
+        <ion-spinner
+          *ngIf="guardando"
+          slot="start"
+          name="crescent">
+        </ion-spinner>
+
+        <ion-icon
+          *ngIf="!guardando"
+          slot="start"
+          name="save-outline">
+        </ion-icon>
+
+        {{
+          guardando
+            ? 'Guardando...'
+            : editando
+            ? 'Guardar cambios'
+            : 'Registrar salón'
+        }}
+
+      </ion-button>
+
+      <!-- VOLVER -->
+
+      <ion-button
+        expand="block"
+        fill="clear"
+        [disabled]="guardando"
+        (click)="volver()">
+
+        Volver
+
+      </ion-button>
+
+    </div>
+
+  </ng-container>
+
 </ion-content>
