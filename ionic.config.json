@@ -1,0 +1,7 @@
+{
+  "name": "Aurora",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular-standalone"
+}
