@@ -1,13 +1,699 @@
+
 <ion-header [translucent]="true">
-  <ion-toolbar>
-    <ion-title>materias</ion-title>
+
+  <ion-toolbar color="primary">
+
+    <ion-buttons slot="start">
+
+      <ion-back-button
+        *ngIf="vista === 'lista'"
+        defaultHref="/home">
+      </ion-back-button>
+
+      <ion-button
+        *ngIf="vista !== 'lista'"
+        (click)="regresar()"
+        aria-label="Regresar">
+
+        <ion-icon
+          slot="icon-only"
+          name="arrow-back-outline">
+        </ion-icon>
+
+      </ion-button>
+
+    </ion-buttons>
+
+    <ion-title>
+      {{
+        vista === 'lista'
+          ? 'Materias'
+          : vista === 'detalle'
+          ? 'Detalle de materia'
+          : editando
+          ? 'Editar materia'
+          : 'Nueva materia'
+      }}
+    </ion-title>
+
+    <ion-buttons
+      slot="end"
+      *ngIf="vista === 'lista' && esAdmin">
+
+      <ion-button
+        (click)="nueva()"
+        aria-label="Registrar materia">
+
+        <ion-icon
+          slot="icon-only"
+          name="add-outline">
+        </ion-icon>
+
+      </ion-button>
+
+    </ion-buttons>
+
   </ion-toolbar>
+
 </ion-header>
 
+
 <ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">materias</ion-title>
-    </ion-toolbar>
-  </ion-header>
+
+  <!-- ================================= -->
+  <!-- LISTADO DE MATERIAS -->
+  <!-- ================================= -->
+
+  <ng-container *ngIf="vista === 'lista'">
+
+    <ion-refresher
+      slot="fixed"
+      (ionRefresh)="refrescar($event)">
+
+      <ion-refresher-content>
+      </ion-refresher-content>
+
+    </ion-refresher>
+
+
+    <div class="ion-padding">
+
+      <h2>Materias registradas</h2>
+
+      <p>
+        Consulta asignaturas, créditos, horas
+        y prerrequisitos.
+      </p>
+
+      <!-- BUSCADOR -->
+
+      <ion-searchbar
+        name="busqueda"
+        [(ngModel)]="busqueda"
+        [debounce]="200"
+        placeholder="Buscar por clave o nombre">
+      </ion-searchbar>
+
+
+      <!-- FILTRO -->
+
+      <ion-item>
+
+        <ion-select
+          name="filtro"
+          label="Filtrar por estado"
+          labelPlacement="stacked"
+          interface="action-sheet"
+          [(ngModel)]="filtro">
+
+          <ion-select-option value="Todas">
+            Todas
+          </ion-select-option>
+
+          <ion-select-option value="Activa">
+            Activas
+          </ion-select-option>
+
+          <ion-select-option value="Inactiva">
+            Inactivas
+          </ion-select-option>
+
+        </ion-select>
+
+      </ion-item>
+
+
+      <ion-note
+        *ngIf="!cargando && !errorLista">
+
+        {{ materiasFiltradas.length }}
+        materia(s) encontrada(s)
+
+      </ion-note>
+
+    </div>
+
+
+    <!-- INDICADOR DE CARGA -->
+
+    <div
+      class="ion-padding ion-text-center"
+      *ngIf="cargando || cargandoDetalle">
+
+      <ion-spinner name="crescent">
+      </ion-spinner>
+
+      <p>
+        {{
+          cargandoDetalle
+            ? 'Consultando materia...'
+            : 'Cargando materias...'
+        }}
+      </p>
+
+    </div>
+
+
+    <!-- ERROR AL LISTAR -->
+
+    <ion-text
+      color="danger"
+      *ngIf="errorLista">
+
+      <p class="ion-padding" role="alert">
+        {{ errorLista }}
+      </p>
+
+    </ion-text>
+
+    <ion-button
+      *ngIf="errorLista && !cargando"
+      expand="block"
+      fill="outline"
+      (click)="cargarMaterias()">
+
+      Reintentar
+
+    </ion-button>
+
+
+    <!-- ERROR AL CONSULTAR -->
+
+    <ion-text
+      color="danger"
+      *ngIf="errorDetalle">
+
+      <p class="ion-padding" role="alert">
+        {{ errorDetalle }}
+      </p>
+
+    </ion-text>
+
+
+    <!-- LISTA DE MATERIAS -->
+
+    <ion-list
+      [inset]="true"
+      *ngIf="!cargando && !errorLista">
+
+      <ion-item
+        *ngFor="let materia of materiasFiltradas"
+        button
+        detail="true"
+        [disabled]="cargandoDetalle"
+        (click)="abrirDetalle(materia)">
+
+        <ion-icon
+          slot="start"
+          name="book-outline"
+          color="primary">
+        </ion-icon>
+
+        <ion-label>
+
+          <h2>
+            {{ materia.nombre }}
+          </h2>
+
+          <p>
+            {{ materia.clave_materia }}
+            · {{ materia.creditos }} créditos
+          </p>
+
+          <p>
+            Teoría: {{ materia.horas_teoricas }} h
+            · Práctica: {{ materia.horas_practicas }} h
+          </p>
+
+          <p *ngIf="materia.nombre_requisito">
+            Requisito: {{ materia.nombre_requisito }}
+          </p>
+
+          <ion-badge
+            [color]="
+              materia.estado === 'Activa'
+                ? 'success'
+                : 'medium'
+            ">
+
+            {{ materia.estado }}
+
+          </ion-badge>
+
+        </ion-label>
+
+      </ion-item>
+
+    </ion-list>
+
+
+    <!-- SIN RESULTADOS -->
+
+    <div
+      class="ion-padding ion-text-center"
+      *ngIf="
+        !cargando &&
+        !errorLista &&
+        materiasFiltradas.length === 0
+      ">
+
+      <p>
+        No se encontraron materias.
+      </p>
+
+      <ion-button
+        *ngIf="esAdmin"
+        fill="outline"
+        (click)="nueva()">
+
+        Registrar materia
+
+      </ion-button>
+
+    </div>
+
+  </ng-container>
+
+
+  <!-- ================================= -->
+  <!-- DETALLE DE MATERIA -->
+  <!-- ================================= -->
+
+  <ng-container
+    *ngIf="vista === 'detalle' && seleccionada as materia">
+
+    <div class="ion-padding">
+
+      <h2>
+        {{ materia.nombre }}
+      </h2>
+
+      <ion-badge
+        [color]="
+          materia.estado === 'Activa'
+            ? 'success'
+            : 'medium'
+        ">
+
+        {{ materia.estado }}
+
+      </ion-badge>
+
+
+      <!-- INFORMACIÓN ACADÉMICA -->
+
+      <h3>Información académica</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+          <ion-label>
+            <h3>Identificador</h3>
+            <p>{{ materia.id_materia }}</p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Clave</h3>
+            <p>{{ materia.clave_materia }}</p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Nombre</h3>
+            <p>{{ materia.nombre }}</p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Créditos</h3>
+            <p>{{ materia.creditos }}</p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Horas teóricas</h3>
+            <p>{{ materia.horas_teoricas }}</p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Horas prácticas</h3>
+            <p>{{ materia.horas_practicas }}</p>
+          </ion-label>
+        </ion-item>
+
+        <ion-item>
+
+          <ion-label>
+
+            <h3>Prerrequisito</h3>
+
+            <p
+              *ngIf="
+                materia.id_materia_requisito;
+                else sinRequisito
+              ">
+
+              {{
+                materia.clave_requisito ||
+                'ID ' + materia.id_materia_requisito
+              }}
+
+              <span *ngIf="materia.nombre_requisito">
+                · {{ materia.nombre_requisito }}
+              </span>
+
+            </p>
+
+            <ng-template #sinRequisito>
+
+              <p>Sin prerrequisito</p>
+
+            </ng-template>
+
+          </ion-label>
+
+        </ion-item>
+
+        <ion-item>
+          <ion-label>
+            <h3>Estado</h3>
+            <p>{{ materia.estado }}</p>
+          </ion-label>
+        </ion-item>
+
+      </ion-list>
+
+
+      <!-- ACCIONES DE ADMINISTRADOR -->
+
+      <ng-container *ngIf="esAdmin">
+
+        <ion-button
+          expand="block"
+          (click)="editar()">
+
+          <ion-icon
+            name="create-outline"
+            slot="start">
+          </ion-icon>
+
+          Editar materia
+
+        </ion-button>
+
+
+        <!-- DESACTIVAR -->
+
+        <ion-button
+          *ngIf="materia.estado === 'Activa'"
+          expand="block"
+          fill="outline"
+          color="danger"
+          [disabled]="desactivando"
+          (click)="confirmarDesactivacion()">
+
+          <ion-icon
+            name="ban-outline"
+            slot="start">
+          </ion-icon>
+
+          Desactivar materia
+
+        </ion-button>
+
+
+        <!-- REACTIVAR DESDE EDICIÓN -->
+
+        <ion-note
+          *ngIf="materia.estado === 'Inactiva'">
+
+          Puedes reactivarla desde
+          «Editar materia».
+
+        </ion-note>
+
+      </ng-container>
+
+    </div>
+
+  </ng-container>
+
+
+  <!-- ================================= -->
+  <!-- FORMULARIO NUEVO / EDITAR -->
+  <!-- ================================= -->
+
+  <ng-container
+    *ngIf="vista === 'formulario' && esAdmin">
+
+    <div class="ion-padding">
+
+      <p>
+        {{
+          editando
+            ? 'Actualiza la información de la asignatura.'
+            : 'Completa los datos de la nueva materia.'
+        }}
+      </p>
+
+
+      <!-- DATOS PRINCIPALES -->
+
+      <h3>Datos de la materia</h3>
+
+      <ion-list [inset]="true">
+
+        <!-- CLAVE -->
+
+        <ion-item>
+
+          <ion-input
+            name="clave_materia"
+            label="Clave de materia *"
+            labelPlacement="stacked"
+            [(ngModel)]="formulario.clave_materia"
+            [maxlength]="15"
+            placeholder="Ej. TIC1001">
+          </ion-input>
+
+        </ion-item>
+
+
+        <!-- NOMBRE -->
+
+        <ion-item>
+
+          <ion-input
+            name="nombre"
+            label="Nombre *"
+            labelPlacement="stacked"
+            [(ngModel)]="formulario.nombre"
+            [maxlength]="150"
+            placeholder="Ej. Programación orientada a objetos">
+          </ion-input>
+
+        </ion-item>
+
+
+        <!-- CRÉDITOS -->
+
+        <ion-item>
+
+          <ion-input
+            name="creditos"
+            label="Créditos (3 a 6) *"
+            labelPlacement="stacked"
+            type="number"
+            inputmode="numeric"
+            min="3"
+            max="6"
+            step="1"
+            [(ngModel)]="formulario.creditos">
+          </ion-input>
+
+        </ion-item>
+
+
+        <!-- HORAS TEÓRICAS -->
+
+        <ion-item>
+
+          <ion-input
+            name="horas_teoricas"
+            label="Horas teóricas *"
+            labelPlacement="stacked"
+            type="number"
+            inputmode="numeric"
+            min="0"
+            step="1"
+            [(ngModel)]="formulario.horas_teoricas">
+          </ion-input>
+
+        </ion-item>
+
+
+        <!-- HORAS PRÁCTICAS -->
+
+        <ion-item>
+
+          <ion-input
+            name="horas_practicas"
+            label="Horas prácticas *"
+            labelPlacement="stacked"
+            type="number"
+            inputmode="numeric"
+            min="0"
+            step="1"
+            [(ngModel)]="formulario.horas_practicas">
+          </ion-input>
+
+        </ion-item>
+
+      </ion-list>
+
+
+      <!-- PRERREQUISITOS -->
+
+      <h3>Prerrequisitos</h3>
+
+      <ion-list [inset]="true">
+
+        <ion-item>
+
+          <ion-select
+            name="id_materia_requisito"
+            label="Materia prerrequisito"
+            labelPlacement="stacked"
+            interface="alert"
+            [(ngModel)]="formulario.id_materia_requisito">
+
+            <ion-select-option [value]="null">
+              Sin prerrequisito
+            </ion-select-option>
+
+            <ion-select-option
+              *ngFor="let m of requisitosDisponibles"
+              [value]="m.id_materia">
+
+              {{ m.clave_materia }} · {{ m.nombre }}
+
+            </ion-select-option>
+
+          </ion-select>
+
+        </ion-item>
+
+      </ion-list>
+
+      <ion-note>
+        Una materia no puede ser su propio
+        prerrequisito. El servidor también
+        comprueba que no se formen ciclos.
+      </ion-note>
+
+
+      <!-- ESTADO -->
+
+      <ng-container *ngIf="editando">
+
+        <h3>Estado</h3>
+
+        <ion-list [inset]="true">
+
+          <ion-item>
+
+            <ion-select
+              name="estado"
+              label="Estado de la materia"
+              labelPlacement="stacked"
+              interface="action-sheet"
+              [(ngModel)]="formulario.estado">
+
+              <ion-select-option value="Activa">
+                Activa
+              </ion-select-option>
+
+              <ion-select-option value="Inactiva">
+                Inactiva
+              </ion-select-option>
+
+            </ion-select>
+
+          </ion-item>
+
+        </ion-list>
+
+      </ng-container>
+
+
+      <!-- VALIDACIÓN -->
+
+      <ion-note>
+        Los campos marcados con * son obligatorios.
+      </ion-note>
+
+      <ion-text
+        color="danger"
+        *ngIf="errorFormulario">
+
+        <p role="alert">
+          {{ errorFormulario }}
+        </p>
+
+      </ion-text>
+
+
+      <!-- GUARDAR -->
+
+      <ion-button
+        expand="block"
+        (click)="guardar()"
+        [disabled]="guardando">
+
+        <ion-spinner
+          *ngIf="guardando"
+          name="crescent"
+          slot="start">
+        </ion-spinner>
+
+        <ion-icon
+          *ngIf="!guardando"
+          name="save-outline"
+          slot="start">
+        </ion-icon>
+
+        {{
+          guardando
+            ? 'Guardando...'
+            : editando
+            ? 'Guardar cambios'
+            : 'Registrar materia'
+        }}
+
+      </ion-button>
+
+
+      <!-- CANCELAR -->
+
+      <ion-button
+        expand="block"
+        fill="clear"
+        (click)="regresar()"
+        [disabled]="guardando">
+
+        Cancelar
+
+      </ion-button>
+
+    </div>
+
+  </ng-container>
+
 </ion-content>
